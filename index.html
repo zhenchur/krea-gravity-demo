@@ -64,6 +64,11 @@
     .reset:hover { color: white; }
     .setting { display: block; margin-top: 19px; }
     .mass-profile { width:100%; padding:10px 11px; border:1px solid #ffffff25; border-radius:8px; background:#1a2029; color:#edf3fc; font:inherit; font-size:12px; }
+    .flow-direction { margin: 19px 0 0; padding: 0; border: 0; min-width: 0; }
+    .flow-direction legend { font-size: 11px; color: #a9b1bf; padding: 0; margin-bottom: 10px; }
+    .flow-axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .flow-axis { display: grid; gap: 6px; color: #a9b1bf; font-size: 11px; }
+    .flow-axis input { width: 100%; min-width: 0; padding: 8px 6px; border: 1px solid #ffffff25; border-radius: 6px; background: #1a2029; color: #edf3fc; font-size: 13px; }
     .profile-note { margin:10px 0 0; color:#929dab; font-size:11px; line-height:1.5; }
     .setting-head { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #a9b1bf; margin-bottom: 10px; }
     output { font-variant-numeric: tabular-nums; color: #e2e9f3; }
@@ -96,6 +101,7 @@
       .footer { position: relative; inset: auto; flex: none; margin: 0 calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left)); padding-bottom: calc(22px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
       .footer-controls { margin-left: auto; }
       .quiet-button { width: 40px; height: 40px; }
+      .flow-axis input { font-size: 16px; }
       .scene .settings { bottom: calc(112px + env(safe-area-inset-bottom)); max-height: calc(100svh - 150px); max-height: calc(var(--visible-height, 100dvh) - 150px); width: min(270px, calc(100vw - 40px)); }
       .send { width: 40px; height: 40px; }
     }
@@ -136,15 +142,6 @@
       </div>
       <section class="settings" id="settings" aria-label="Настройки пространства" hidden>
         <div class="settings-heading"><h2>Параметры пространства</h2><button class="reset" id="reset" type="button">Сбросить</button></div>
-        <label class="setting" for="mass-profile"><span class="setting-head">Распределение массы</span>
-          <select class="mass-profile" id="mass-profile" aria-describedby="mass-profile-note">
-            <option value="shell">Узкая оболочка</option>
-            <option value="wide">Широкая оболочка</option>
-            <option value="compact">Масса внутри формы</option>
-            <option value="original" selected>Исходный объём</option>
-          </select>
-        </label>
-        <p class="profile-note" id="mass-profile-note"></p>
         <label class="setting" for="gravity"><span class="setting-head">Масса линзы<output id="gravity-value" for="gravity">26%</output></span><input id="gravity" type="range" min="0" max="400" value="26" step="1"></label>
         <label class="setting" for="localBoost"><span class="setting-head">Локальное усиление<output id="localBoost-value" for="localBoost">3000%</output></span><input id="localBoost" type="range" min="0" max="3000" value="3000" step="1" aria-describedby="local-boost-note"></label>
         <label class="setting" for="localWidth"><span class="setting-head">Ширина зоны<output id="localWidth-value" for="localWidth">25 px</output></span><input id="localWidth" type="range" min="1" max="150" value="25" step="1" data-scale="1" data-unit="px" aria-describedby="local-boost-note"></label>
@@ -155,6 +152,15 @@
         <label class="setting" for="uniformity"><span class="setting-head">Однородность<output id="uniformity-value" for="uniformity">100%</output></span><input id="uniformity" type="range" min="0" max="100" value="100" step="1" aria-describedby="uniformity-note"></label>
         <p class="profile-note" id="uniformity-note">Для звёзд и галактик. 100% — равномерное поле, 0% — плотные и разреженные области.</p>
         <label class="setting" for="speed"><span class="setting-head">Скорость<output id="speed-value" for="speed">2.0×</output></span><input id="speed" type="range" min="0" max="200" value="200" step="5"></label>
+        <fieldset class="flow-direction" aria-describedby="flow-direction-note">
+          <legend>Направление движения</legend>
+          <div class="flow-axes">
+            <label class="flow-axis" for="flow-x">X<input id="flow-x" type="number" min="-1" max="1" step="0.1" value="0" aria-label="Направление X"></label>
+            <label class="flow-axis" for="flow-y">Y<input id="flow-y" type="number" min="-1" max="1" step="0.1" value="0" aria-label="Направление Y"></label>
+            <label class="flow-axis" for="flow-z">Z<input id="flow-z" type="number" min="-1" max="1" step="0.1" value="1" aria-label="Направление Z"></label>
+          </div>
+          <p class="profile-note" id="flow-direction-note">X — вправо, Y — вверх, Z — к камере. От −1 до 1; минус меняет направление. Оси складываются, скорость задаётся выше.</p>
+        </fieldset>
         <label class="probe-toggle"><input id="lens-grid" type="checkbox">Сетка искажения</label>
         <div id="grid-controls" hidden>
           <label class="setting" for="grid-depth"><span class="setting-head">Глубина сетки</span>
@@ -184,6 +190,7 @@
   <script src="lens-intro.js?v=11"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
+  <script src="star-flow.js?v=1"></script>
   <script src="render-policy.js?v=1"></script>
 
   <script>
@@ -215,7 +222,8 @@
     const probe = { enabled: false, x: -69, y: 0, depth: 2600 };
     const STAR_STRIDE = 13;
     const settingsDefault = { gravity: .26, localBoost: 30, localWidth: 25, density: .25, largeStars: .005, galaxies: 74, uniformity: 1, speed: 2 };
-    const profileDefault = 'original', gridDepthDefault = '2640';
+    const massProfile = 'original', gridDepthDefault = '2640';
+    const flowDirection=[0,0,1],fieldTranslation=new GravityStarFlow.Translation();
     const restored = { settings: settingsDefault };
     // Opt-in still frames for visual QA; ordinary visits use the existing clock.
     const previewQuery=new URLSearchParams(location.search).get('intro');
@@ -224,17 +232,6 @@
     const grid={enabled:byId('lens-grid').checked,layer:DEPTHS.indexOf(Number(byId('grid-depth').value))};
     byId('grid-controls').hidden=!grid.enabled;
     scene.dataset.rim=String(byId('rim-effects').checked);
-    let massProfile=restored.profile||profileDefault;
-    byId('mass-profile').value=massProfile;
-    function updateProfileNote() {
-      byId('mass-profile-note').textContent={
-        shell:'Увеличение рядом с рамкой. Подобранная плотность; часть массы находится снаружи инпута.',
-        wide:'Более широкая область увеличения. Объём массы сильнее выступает за рамку.',
-        compact:'Центры масс остаются внутри формы. Эффект мягче, особенно вдоль длинных сторон.',
-        original:'Прежняя равномерная плотность. При большой массе возможны боковые пики и овальная область.'
-      }[massProfile];
-    }
-    updateProfileNote();
     const state = {
       width: 1, height: 1, centerX: 0, centerY: 0, halfWidth: 1, halfHeight: 1, radius: 32,
       time: previewTime ?? restored.time ?? (reducedMotion.matches ? REDUCED_MOTION_TIME : 0),
@@ -339,7 +336,9 @@
       uniform vec3 camera, cameraRight, cameraUp, cameraForward;
       uniform vec2 resolution, projectionCenter;
       uniform vec4 sourceViewport;
-      uniform float arrival, elapsed, expansion, flowDistance, recyclePlane, largeStarFraction, pixelRatio, densityVariation;
+      uniform float arrival, elapsed, expansion, recyclePlane, largeStarFraction, pixelRatio, densityVariation;
+      uniform vec3 flowOffset;
+      uniform vec2 wrapAxes;
       uniform vec3 sourceDepths;
       out vec3 tint;
       out float energy, angle, aspect, spriteSize, foreground;
@@ -359,15 +358,19 @@
         vec3 birthplace=vec3(0.0,0.0,-4900.0);
         vec2 volumeHalfSize=vec2(resolution.x/resolution.y,1.0)*${(FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING).toFixed(8)};
         vec3 world=mix(birthplace,vec3(position.xy*volumeHalfSize,position.z),expansion);
-        world.z+=flowDistance;
-        float cycle=max(0.0,ceil((world.z-recyclePlane)/${FLOW_DEPTH.toFixed(1)}));
+        world.z+=flowOffset.z;
+        float cycle=ceil((world.z-recyclePlane)/${FLOW_DEPTH.toFixed(1)});
         world.z-=cycle*${FLOW_DEPTH.toFixed(1)};
         vec2 fieldXY=position.xy;
-        if(cycle>0.0) {
-          uint seed=uint(gl_VertexID)*0x9e3779b9u+uint(cycle)*0x85ebca6bu;
+        if(cycle!=0.0) {
+          uint seed=uint(gl_VertexID)*0x9e3779b9u+uint(int(cycle))*0x85ebca6bu;
           fieldXY=vec2(float(hashBits(seed)),float(hashBits(seed^0x68bc21ebu)))/4294967296.0*2.0-1.0;
         }
         world.xy=naturalCoordinates(fieldXY,(-4000.0-position.z)/${FLOW_DEPTH.toFixed(1)}+cycle)*volumeHalfSize*expansion;
+        world.xy+=flowOffset.xy;
+        world.xy-=floor((world.xy+volumeHalfSize)/(2.0*volumeHalfSize))*(2.0*volumeHalfSize);
+        vec2 boundaryFade=smoothstep(vec2(0.0),min(volumeHalfSize*.05,vec2(500.0)),volumeHalfSize-abs(world.xy));
+        float sideFade=mix(1.0,boundaryFade.x,wrapAxes.x)*mix(1.0,boundaryFade.y,wrapAxes.y);
         vec3 ray=world-camera;
         vec3 view=vec3(dot(ray,cameraRight),dot(ray,cameraUp),dot(ray,cameraForward));
         view.xy/=${OPTICAL_ZOOM.toFixed(1)};
@@ -394,7 +397,7 @@
           ?clamp((1.0/distance-1.0/sourceDepths.x)/(1.0/sourceDepths.y-1.0/sourceDepths.x),0.0,1.0):1.0;
         else layerWeight=sourceDepths.z>0.0
           ?clamp((1.0/distance-1.0/sourceDepths.z)/(1.0/sourceDepths.y-1.0/sourceDepths.z),0.0,1.0):1.0;
-        energy*=layerWeight;
+        energy*=layerWeight*sideFade;
         if(layerWeight==0.0){gl_Position=vec4(2.0,2.0,2.0,1.0);gl_PointSize=1.0;}
         energy*=1.0+float(objectKind==0)*arrival*step(.88,fract(star.z*7.13))*step(1.0,star.y)
           *(sin(elapsed*(.7+star.w)+star.z)*.25+sin(elapsed*2.3+star.z*4.0)*.12);
@@ -642,14 +645,14 @@
       const fieldLinear=!!gl.getExtension('OES_texture_float_linear');
       const profiler=null;
       const starsProgram=compileProgram(starVertex,starFragment),lensProgram=compileProgram(screenVertex,lensFragment),fieldProgram=compileProgram(screenVertex,fieldFragment);
-      const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowDistance recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
+      const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowOffset wrapAxes recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
       const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox cornerRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
       const fieldU=locations(fieldProgram,'massCells cellCount softening focal sourceDepth resolution projectionCenter');
       const starVAO=gl.createVertexArray(),screenVAO=gl.createVertexArray();gl.bindVertexArray(starVAO);
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,stars,gl.STATIC_DRAW);
       [3,3,4,3].forEach((size,index)=>{gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,size,gl.FLOAT,false,STAR_STRIDE*4,[0,12,24,40][index]);});
       const buckets=new StarDepthBuckets(DEPTHS,MAX_SOURCES),indices=gl.createBuffer();
-      const recycleCycles=new Int32Array(MAX_SOURCES).fill(-1),recycleXY=new Float64Array(MAX_SOURCES*2);
+      const recycleCycles=new Int32Array(MAX_SOURCES).fill(-2147483648),recycleXY=new Float64Array(MAX_SOURCES*2);
       const coordinateCache={variation:NaN};
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,buckets.indices.byteLength,gl.DYNAMIC_DRAW);
       const starTexture=gl.createTexture(),fieldTexture=gl.createTexture(),massTexture=gl.createTexture(),target=gl.createFramebuffer();
@@ -903,29 +906,31 @@
         updateSourceBounds();
         resizeSources();
         const motion=motionAt(state.time),camera=cameraPose(motion.progress),arrival=state.formReveal;
+        const flowOffset=fieldTranslation.advance(motion.flow,flowDirection);
         buckets.reset();
         const projection=state.lensShape||state;
         const densityVariation=1-settingsValue.uniformity;
-        if(coordinateCache.variation!==densityVariation){recycleCycles.fill(-1);coordinateCache.variation=densityVariation;}
+        if(coordinateCache.variation!==densityVariation){recycleCycles.fill(-2147483648);coordinateCache.variation=densityVariation;}
         if(!probe.enabled) {
-          const starTotal=starCount(),count=starTotal+settingsValue.galaxies,expansion=motion.progress,flow=motion.flow;
+          const starTotal=starCount(),count=starTotal+settingsValue.galaxies,expansion=motion.progress;
           const plane=Math.max(RECYCLE_Z,camera.eye[2]+100),focal=state.height*FIELD_FOCAL*.5;
           const halfY=FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING,halfX=halfY*state.width/state.height;
           for(let ordinal=0;ordinal<count;ordinal++) {
             const i=ordinal<starTotal?ordinal:MAX_STARS+ordinal-starTotal;
             const offset=i*STAR_STRIDE;
-            let z=-4900+(stars[offset+2]+4900)*expansion+flow;
-            const cycle=Math.max(0,Math.ceil((z-plane)/FLOW_DEPTH));z-=cycle*FLOW_DEPTH;
+            let z=-4900+(stars[offset+2]+4900)*expansion+flowOffset[2];
+            const cycle=GravityStarFlow.cycle(z,plane,FLOW_DEPTH);z-=cycle*FLOW_DEPTH;
             const depth=camera.eye[2]-z;
             if(depth<99.96)continue;
             if(recycleCycles[i]!==cycle) {
-              const xy=cycle>0?cycleCoordinates(i,cycle,stars[offset+2],densityVariation)
+              const xy=cycle!==0?cycleCoordinates(i,cycle,stars[offset+2],densityVariation)
                 :naturalCoordinates(stars[offset],stars[offset+1],(RECYCLE_Z-stars[offset+2])/FLOW_DEPTH,densityVariation);
               recycleXY[i*2]=xy[0];recycleXY[i*2+1]=xy[1];recycleCycles[i]=cycle;
             }
-            let x=recycleXY[i*2],y=recycleXY[i*2+1];
-            x=(x*halfX*expansion-camera.eye[0])*focal/depth+projection.centerX;
-            y=(y*halfY*expansion-camera.eye[1])*focal/depth+state.height-projection.centerY;
+            let x=GravityStarFlow.wrap(recycleXY[i*2]*halfX*expansion+flowOffset[0],halfX);
+            let y=GravityStarFlow.wrap(recycleXY[i*2+1]*halfY*expansion+flowOffset[1],halfY);
+            x=(x-camera.eye[0])*focal/depth+projection.centerX;
+            y=(y-camera.eye[1])*focal/depth+state.height-projection.centerY;
             buckets.add(i,depth,x,y,sourceViewports);
           }
         }
@@ -935,7 +940,7 @@
         gl.uniform3fv(starU.camera,camera.eye);gl.uniform3fv(starU.cameraRight,camera.right);gl.uniform3fv(starU.cameraUp,camera.up);gl.uniform3fv(starU.cameraForward,camera.forward);
         gl.uniform2f(starU.resolution,state.width,state.height);gl.uniform2f(starU.projectionCenter,projection.centerX,state.height-projection.centerY);
         gl.uniform1f(starU.arrival,arrival);gl.uniform1f(starU.elapsed,state.time);gl.uniform1f(starU.storageScale,1);
-        gl.uniform1f(starU.expansion,motion.progress);gl.uniform1f(starU.flowDistance,motion.flow);gl.uniform1f(starU.largeStarFraction,settingsValue.largeStars);
+        gl.uniform1f(starU.expansion,motion.progress);gl.uniform3fv(starU.flowOffset,flowOffset);gl.uniform2fv(starU.wrapAxes,fieldTranslation.wrapAxes);gl.uniform1f(starU.largeStarFraction,settingsValue.largeStars);
         gl.uniform1f(starU.densityVariation,densityVariation);
         gl.uniform1f(starU.recyclePlane,Math.max(RECYCLE_Z,camera.eye[2]+100));
         gl.useProgram(lensProgram);
@@ -995,7 +1000,8 @@
       const ctx=canvas.getContext('2d');gl=null;resizeTarget=()=>{};
       renderer=()=>{
         const dpr=canvas.width/state.width;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#000';ctx.fillRect(0,0,state.width,state.height);
-        const motion=motionAt(state.time),camera=cameraPose(motion.progress),focal=state.height*FIELD_FOCAL*.5,expansion=motion.progress,flow=motion.flow;
+        const motion=motionAt(state.time),camera=cameraPose(motion.progress),focal=state.height*FIELD_FOCAL*.5,expansion=motion.progress;
+        const flowOffset=fieldTranslation.advance(motion.flow,flowDirection);
         const recyclePlane=Math.max(RECYCLE_Z,camera.eye[2]+100);
         const volumeY=FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING,volumeX=volumeY*state.width/state.height;
         const starTotal=starCount();
@@ -1004,11 +1010,14 @@
           const index=ordinal<starTotal?ordinal:MAX_STARS+ordinal-starTotal;
           const i=index*STAR_STRIDE;
           const large=stars[i+10]>=0&&stars[i+10]<settingsValue.largeStars;
-          let worldZ=-4900+(stars[i+2]+4900)*expansion+flow;
-          const cycle=Math.max(0,Math.ceil((worldZ-recyclePlane)/FLOW_DEPTH));worldZ-=cycle*FLOW_DEPTH;
-          const xy=cycle>0?cycleCoordinates(index,cycle,stars[i+2],1-settingsValue.uniformity)
+          let worldZ=-4900+(stars[i+2]+4900)*expansion+flowOffset[2];
+          const cycle=GravityStarFlow.cycle(worldZ,recyclePlane,FLOW_DEPTH);worldZ-=cycle*FLOW_DEPTH;
+          const xy=cycle!==0?cycleCoordinates(index,cycle,stars[i+2],1-settingsValue.uniformity)
             :naturalCoordinates(stars[i],stars[i+1],(RECYCLE_Z-stars[i+2])/FLOW_DEPTH,1-settingsValue.uniformity);
-          let worldX=xy[0]*volumeX*expansion,worldY=xy[1]*volumeY*expansion;
+          const worldX=GravityStarFlow.wrap(xy[0]*volumeX*expansion+flowOffset[0],volumeX);
+          const worldY=GravityStarFlow.wrap(xy[1]*volumeY*expansion+flowOffset[1],volumeY);
+          const sideFade=(fieldTranslation.wrapAxes[0]?smooth(0,Math.min(volumeX*.05,500),volumeX-Math.abs(worldX)):1)
+            *(fieldTranslation.wrapAxes[1]?smooth(0,Math.min(volumeY*.05,500),volumeY-Math.abs(worldY)):1);
           const delta=[worldX-camera.eye[0],worldY-camera.eye[1],worldZ-camera.eye[2]],z=dot(delta,camera.forward);
           if(z<100)continue;
           const projected=[state.lensShape.centerX+dot(delta,camera.right)*focal/z,state.height-state.lensShape.centerY+dot(delta,camera.up)*focal/z];
@@ -1017,7 +1026,7 @@
           const energy=large?stars[i+12]:stars[i+7];
           const size=Math.max(.3,Math.min(3.8,characterSize*1400/z));
           const seed=(stars[i+8]*7.13)%1,birthAlpha=seed<.025?1:smooth(.08+seed*.42,.48+seed*.52,expansion);
-          const alpha=birthAlpha*(.45+.55*smooth(.1,.9,expansion))*smooth(100,400,z)*smooth(recyclePlane-FLOW_DEPTH,recyclePlane-FLOW_DEPTH+1600,worldZ);
+          const alpha=sideFade*birthAlpha*(.45+.55*smooth(.1,.9,expansion))*smooth(100,400,z)*smooth(recyclePlane-FLOW_DEPTH,recyclePlane-FLOW_DEPTH+1600,worldZ);
           ctx.fillStyle=`rgba(190,215,255,${Math.min(.9,.1+energy*.3)*alpha})`;ctx.beginPath();ctx.arc(x,state.height-y,size,0,Math.PI*2);ctx.fill();
         }
       };
@@ -1157,6 +1166,7 @@
     });
     byId('replay').addEventListener('click',()=>{
       input.blur();
+      fieldTranslation.reset();
       state.time=0;state.effectsTime=0;state.pulse=-100;state.engagement=0;state.activation=0;state.overForm=false;state.hoverSuppressed=false;
       for(const tween of Object.values(interactionTweens)){tween.from=0;tween.to=0;tween.since=0;}
       state.pointerX=0;state.pointerY=0;
@@ -1178,9 +1188,24 @@
     function syncGrid(){grid.enabled=byId('lens-grid').checked;grid.layer=DEPTHS.indexOf(Number(byId('grid-depth').value));byId('grid-controls').hidden=!grid.enabled;renderer();}
     byId('lens-grid').addEventListener('change',syncGrid);byId('grid-depth').addEventListener('change',syncGrid);
     byId('rim-effects').addEventListener('change',()=>{scene.dataset.rim=String(byId('rim-effects').checked);});
-    byId('mass-profile').addEventListener('change',()=>{massProfile=byId('mass-profile').value;updateProfileNote();resize();});
+    for(const [axis,id] of ['flow-x','flow-y','flow-z'].entries()){
+      const field=byId(id);
+      field.addEventListener('input',()=>{
+        const value=field.valueAsNumber;
+        // Allow intermediate empty/minus text while editing; keep the last
+        // valid coefficient until the user supplies a number.
+        if(!Number.isFinite(value))return;
+        fieldTranslation.advance(motionAt(state.time).flow,flowDirection);
+        flowDirection[axis]=Math.max(-1,Math.min(1,value));
+        if(flowDirection[axis]!==value)field.value=String(flowDirection[axis]);
+        renderer();
+      });
+      field.addEventListener('change',()=>{field.value=String(flowDirection[axis]);});
+    }
     byId('reset').addEventListener('click',()=>{
-      massProfile=profileDefault;byId('mass-profile').value=massProfile;updateProfileNote();
+      fieldTranslation.advance(motionAt(state.time).flow,flowDirection);
+      flowDirection.splice(0,3,0,0,1);
+      for(const [axis,id] of ['flow-x','flow-y','flow-z'].entries())byId(id).value=String(flowDirection[axis]);
       byId('lens-grid').checked=false;byId('grid-depth').value=gridDepthDefault;syncGrid();
       byId('rim-effects').checked=true;scene.dataset.rim='true';
       byId('lens-probe').checked=false;
@@ -1213,6 +1238,6 @@
     syncPause();start();
   })();
   </script>
-  <script src="mobile-viewport.js?v=1"></script>
+  <script src="mobile-viewport.js?v=2"></script>
 </body>
 </html>

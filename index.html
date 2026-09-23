@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
+  <meta name="theme-color" content="#030405">
+  <meta name="description" content="Интерактивное звёздное поле с гравитационной линзой вокруг строки поиска.">
+  <title>Gravity — пространство для идей</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23030405'/%3E%3Cellipse cx='32' cy='32' rx='24' ry='10' transform='rotate(-35 32 32)' stroke='white' fill='none' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='6' fill='white'/%3E%3C/svg%3E">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #030405; color: #f5f6f8; font-synthesis: none; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input, textarea { font: inherit; }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #bfd6ff; outline-offset: 5px; }
+    button:disabled { cursor: default; }
+    [hidden] { display: none !important; }
+    .scene { position: relative; min-height: 620px; height: 100svh; isolation: isolate; overflow: hidden; background: #000; }
+    #universe { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -3; opacity: 0; }
+    .topbar { opacity: 0; position: absolute; z-index: 3; top: 0; inset-inline: 0; display: flex; align-items: center; justify-content: center; padding: 30px 42px; }
+    .wordmark { display: flex; align-items: center; gap: 11px; font-size: 22px; font-weight: 500; letter-spacing: -1px; }
+    .orbital { display: inline-block; position: relative; width: 30px; height: 30px; }
+    .orbital::before { content: ""; position: absolute; inset: 8px 0; border: 1.3px solid #eee; border-radius: 50%; transform: rotate(-38deg); }
+    .orbital::after { content: ""; position: absolute; width: 7px; height: 7px; left: 11.5px; top: 11.5px; background: #f2f4f8; border-radius: 50%; box-shadow: 0 0 12px #d7e5ff45; }
+    .composition { opacity: 0; position: absolute; width: min(780px, calc(100% - 72px)); left: 50%; top: 45%; transform: translate(-50%, -50%); }
+    .intro { text-align: center; margin-bottom: 38px; }
+    h1 { margin: 0; font-size: clamp(34px, 4.65vw, 64px); font-weight: 400; line-height: 1.06; letter-spacing: -.055em; text-wrap: balance; }
+    .subtitle { margin: 18px 0 0; color: #959aa4; font-size: 15px; line-height: 1.5; letter-spacing: -.15px; }
+    .prompt { --prompt-radius: 32px; --frame-light: 0; position: relative; margin-inline: auto; background: #000; border: 1px solid rgb(154 175 196 / calc(.502 * var(--frame-light))); border-radius: var(--prompt-radius); padding: 21px 21px 14px; box-shadow: 0 0 0 1px rgb(160 200 255 / calc(.047 * var(--frame-light))), 0 0 7px rgb(180 215 255 / calc(.125 * var(--frame-light))), 0 0 24px rgb(157 199 255 / calc(.047 * var(--frame-light))), inset 0 0 20px rgb(153 186 255 / calc(.012 * var(--frame-light))); }
+    .prompt::before { content: ""; opacity: var(--frame-light); position: absolute; inset: -2px; pointer-events: none; border-radius: inherit; border: 1px solid transparent; background: linear-gradient(115deg, #b9d9ff50, transparent 22%, transparent 70%, #d6e8ff65) border-box; mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); mask-composite: exclude; }
+    .prompt:focus-within { border-color: #d1e1f0bf; box-shadow: 0 0 0 1px #a0c8ff15, 0 0 16px #b4d7ff32, 0 0 60px #9dc7ff12; }
+    @property --agent-glow-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+    .effect-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
+    .photon-ring { --photon-angle: 0deg; pointer-events: none; position: absolute; inset: -3px; border-radius: calc(var(--prompt-radius) + 3px); opacity: 0; filter: drop-shadow(0 0 1.5px #d7eeffb3) drop-shadow(0 0 6px #8bcaff99); }
+    .photon-ring::before, .photon-ring::after { content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; background: conic-gradient(from var(--photon-angle), #759ec283, #c0dfffd9 38deg, #fff 67deg, #d5edffeb 85deg, #8fb9da80 155deg, #a9d8ffab 220deg, #eff9ffed 258deg, #90bee499 295deg, #759ec283); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) border-box; mask-composite: exclude; }
+    .photon-ring::after { inset: -2px; padding: .5px; border-radius: calc(var(--prompt-radius) + 5px); opacity: .25; }
+    .prompt-streaks { pointer-events: none; position: absolute; inset: -4px; border-radius: calc(var(--prompt-radius) + 4px); filter: url(#agent-streak-texture) drop-shadow(0 0 2px #fff) drop-shadow(0 0 9px #75baff); opacity: calc(.65 * var(--frame-light)); }
+    .prompt-streaks::before { content: ""; position: absolute; inset: 1px; border-radius: calc(var(--prompt-radius) + 3px); padding: 4px; opacity: .8; background: conic-gradient(from var(--agent-glow-angle), transparent, #b9dcff80 5deg, white 8deg 10deg, #b9dcff30 10.5deg, white 11deg 14deg, transparent 15deg 125deg, #b9dcff80 136deg, white 139deg 141deg, transparent 142deg, white 143deg 147deg, transparent 148deg 250deg, white 254deg 257deg, transparent 258deg); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) border-box; mask-composite: exclude; animation: 20s linear infinite agent-glow-orbit, 1.37s ease-in-out infinite agent-glow-shimmer; animation-play-state: paused; }
+    @keyframes agent-glow-orbit { to { --agent-glow-angle: 360deg; } }
+    @keyframes agent-glow-shimmer { 0%, 100% { opacity: .8; } 13% { opacity: 1; } 27% { opacity: .72; } 41% { opacity: .9; } 57% { opacity: .6; } 68% { opacity: .84; } 83% { opacity: .73; } 92% { opacity: .95; } }
+    textarea { display: block; width: 100%; min-height: 42px; height: 42px; max-height: 150px; resize: none; border: 0; border-radius: 0; padding: 0 2px; outline: none; background: transparent; color: #f4f6fa; font-size: 16px; line-height: 1.5; caret-color: #e0edff; }
+    textarea::placeholder { color: #70757e; opacity: 1; }
+    .prompt-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+    .prompt-mode { display: inline-flex; align-items: center; gap: 7px; color: #959eac; font-size: 12px; min-width: 0; }
+    .prompt-mode-text { line-height: 1.25; }
+    .prompt-mode svg { width: 17px; height: 17px; color: #c6d7e9; flex: none; }
+    .send { flex-shrink: 0; }
+    .send { width: 36px; height: 36px; padding: 0; border: 0; background: #edf2f8; color: #0a0d12; border-radius: 50%; display: grid; place-items: center; transition: transform .2s, background .2s; }
+    .send:hover { background: #fff; transform: scale(1.07); }
+    .send:active { transform: scale(.94); }
+    .send svg { width: 17px; height: 17px; }
+    .footer { opacity: 0; position: absolute; z-index: 4; bottom: 27px; inset-inline: 42px; display: flex; align-items: center; justify-content: flex-end; }
+    .footer-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .quiet-button { width: 36px; height: 36px; padding: 0; border-radius: 8px; background: #0b0e12b8; border: 1px solid #ffffff14; color: #a9b0bc; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(12px); transition: background .2s, color .2s; }
+    .quiet-button:hover, .quiet-button[aria-expanded="true"] { background: #161c25; color: #eef4ff; }
+    .quiet-button svg { width: 13px; height: 13px; }
+    .scene[data-rim="false"] .prompt-streaks, .scene[data-rim="false"] .photon-ring, .scene[data-rim="false"] .prompt::before, .scene[data-probe="true"] .prompt-streaks, .scene[data-probe="true"] .photon-ring, .scene[data-probe="true"] .prompt::before { display: none; }
+    .scene[data-rim="false"] .prompt { box-shadow: none; }
+    .scene[data-probe="true"] .prompt { border-color: #ffffff15; box-shadow: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (min-height: 880px) { .composition { top: 46%; } }
+    @media (max-width: 650px) {
+      html { scroll-padding-block: 20px; }
+      body { background: #000; }
+      body::after { content: ""; display: block; height: var(--keyboard-inset, 0px); }
+      .scene { min-height: 100svh; min-height: 100dvh; height: auto; display: flex; flex-direction: column; }
+      .topbar { position: relative; flex: none; padding: calc(20px + env(safe-area-inset-top)) 22px 16px; }
+      .wordmark { font-size: 21px; }
+      .composition { position: relative; left: auto; top: auto; transform: none; width: calc(100% - 80px - env(safe-area-inset-left) - env(safe-area-inset-right)); flex: none; margin: auto; padding-block: 28px 48px; }
+      .intro { margin: 0 -20px 52px; padding-inline: 0; }
+      h1 { font-size: clamp(35px, 7.7vw, 48px); line-height: 1.06; }
+      h1 span { display: block; }
+      .subtitle { font-size: 13px; margin-top: 15px; }
+      .prompt { padding: 18px 17px 13px; }
+      textarea { font-size: 16px; height: 51px; }
+      .footer { position: relative; inset: auto; flex: none; margin: 0 calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left)); padding-bottom: calc(22px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
+      .footer-controls { margin-left: auto; }
+      .quiet-button { width: 40px; height: 40px; }
+      .send { width: 40px; height: 40px; }
+    }
+    @media (max-width: 420px) { .footer { flex-wrap: wrap; } .footer-controls { margin-left: auto; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } }
+  </style>
+
+</head>
+<body data-variant="physical">
+  <main class="scene" id="scene" data-arrived="false">
+    <svg class="effect-defs" aria-hidden="true"><defs><filter id="agent-streak-texture" x="-10%" y="-30%" width="120%" height="160%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.045 0.5" numOctaves="2" seed="8" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G" result="distorted"/><feColorMatrix in="noise" type="saturate" values="0" result="grain"/><feComposite in="distorted" in2="grain" operator="arithmetic" k1="1.5" k2="0.35" k3="0" k4="0"/></filter></defs></svg>
+    <canvas id="universe" aria-hidden="true"></canvas>
+    <header class="topbar">
+      <div class="wordmark"><span class="orbital" aria-hidden="true"></span>gravity</div>
+    </header>
+    <div class="composition">
+      <div class="intro">
+        <h1><span>Пространство</span> <span>для идей.</span></h1>
+        <p class="subtitle">Всё начинается с одного вопроса.</p>
+      </div>
+      <form class="prompt" id="prompt-form">
+        <div class="photon-ring" id="photon-ring" aria-hidden="true"></div>
+        <div class="prompt-streaks" id="prompt-streaks" aria-hidden="true"></div>
+        <label class="sr-only" for="prompt">Ваша идея</label>
+        <textarea id="prompt" rows="1" maxlength="500" autocomplete="off" spellcheck="false" placeholder="Как выглядит ваша следующая идея?"></textarea>
+        <div class="prompt-bottom">
+          <span class="prompt-mode"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8L12 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="prompt-mode-text">Вдохновлено kreaAI</span></span>
+          <button class="send" type="submit" aria-label="Запустить импульс"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </form>
+      <p class="sr-only" id="status" role="status" aria-live="polite"></p>
+    </div>
+    <footer class="footer">
+      <div class="footer-controls">
+        <button class="quiet-button" id="replay" type="button" aria-label="Повторить пролёт" title="Повторить пролёт"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6a5 5 0 1 1 0 5M3 2v4h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="quiet-button" id="pause" type="button" aria-label="Приостановить движение" aria-pressed="false"><svg id="pause-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5 4v8M11 4v8" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      </div>
+    </footer>
+  </main>
+  <script src="mass-profiles.js"></script>
+  <script src="mass-lens.js"></script>
+  <script src="lens-intro.js?v=11"></script>
+  <script src="lens-calibration.js"></script>
+  <script src="star-buckets.js?v=2"></script>
+
+  <script>
+  (() => {
+    'use strict';
+    const byId = id => document.getElementById(id);
+    const scene = byId('scene'), form = byId('prompt-form'), input = byId('prompt');
+    const streakAnimations = byId('prompt-streaks').getAnimations({subtree:true});
+    const photonRing = byId('photon-ring');
+    const composition = document.querySelector('.composition');
+    const heading=document.querySelector('.intro'),branding=document.querySelector('.topbar'),footer=document.querySelector('.footer'),promptBottom=document.querySelector('.prompt-bottom');
+    const status = byId('status'), pauseButton = byId('pause');
+
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    let canvas = byId('universe');
+    const MOTION_DAMPING = GravityIntro.STAR_DAMPING, STAR_REVEAL_DURATION = .28;
+    const REDUCED_MOTION_TIME = Math.max(MOTION_DAMPING*10,GravityIntro.END);
+    const FLOW_SPEED = 110, RECYCLE_Z = -4000, FLOW_DEPTH = 12000;
+    const HOVER_TRAVEL = 3240, FOCUS_MASS = .7;
+    const INTERACTION_SECONDS = GravityIntro.RESPONSE_SECONDS;
+    const WAVE_SECONDS = 1.9, WAVE_SHIFT = 44;
+    const FIELD_FOCAL = 1.80404776, FIELD_PADDING = 1.08;
+    const LOCAL_LENS_SHIFT_LIMIT = 12, LOCAL_LENS_MAX_STRENGTH = 30;
+    const SOURCE_BATCH_SIZE = 4;
+    const { LENS_DEPTH, OPTICAL_ZOOM, DEPTHS, createProfileModel } = GravityPhysics;
+    let massModel, massModelKey = "", fieldMassScale=1;
+    const probe = { enabled: false, x: -69, y: 0, depth: 2600 };
+    const STAR_STRIDE = 13;
+    const settingsDefault = { gravity: .26, localBoost: 30, localWidth: 25, density: .25, largeStars: .005, galaxies: 74, uniformity: 1, speed: 2 };
+    const profileDefault = 'original';
+    const restored = { settings: settingsDefault };
+    // Opt-in still frames for visual QA; ordinary visits use the existing clock.
+    const previewQuery=new URLSearchParams(location.search).get('intro');
+    const previewTime=previewQuery!==null&&Number.isFinite(Number(previewQuery))?Math.max(0,Number(previewQuery)):null;
+    const settingsValue = { ...restored.settings };
+    const grid={enabled:false,layer:DEPTHS.indexOf(2640)};
+    const massProfile=profileDefault;
+    scene.dataset.rim='true';
+    const state = {
+      width: 1, height: 1, centerX: 0, centerY: 0, halfWidth: 1, halfHeight: 1, radius: 32,
+      time: previewTime ?? restored.time ?? (reducedMotion.matches ? REDUCED_MOTION_TIME : 0),
+      pointerX: 0, pointerY: 0, targetX: 0, targetY: 0,
+      engagement: 0, activation: 0, overForm: false, hoverSuppressed: false, paused: previewTime!==null || reducedMotion.matches || restored.paused, visible: true, effectsTime: 0, pulse: -100, formReveal: 0,
+      intro:GravityIntro.timeline(0),lensShape:null
+    };
+    const interactionTweens={engagement:{from:0,to:0,since:0},activation:{from:0,to:0,since:0}};
+    const smooth = (a,b,x) => { const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*t*(t*(t*6-15)+10); };
+    function motionAt(time) {
+      // Critically damped response: one gentle acceleration, then a long tail.
+      // It approaches rest asymptotically; revealing the form never stops motion.
+      const t=Math.max(0,time),u=t/MOTION_DAMPING,decay=Math.exp(-u);
+      const progress=1-(1+u)*decay;
+      // Integral of the same response. The forward stream gradually takes over.
+      const flow=FLOW_SPEED*Math.max(0,t-2*MOTION_DAMPING+(t+2*MOTION_DAMPING)*decay);
+      return {progress,flow};
+    }
+    const starCount = () => Math.min(MAX_STARS,Math.floor((state.width<640?22500:40000)*settingsValue.density));
+    const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    let frame=0, previousTime=0, renderer, resizeTarget=()=>{}, gl, statusTimer;
+
+    // Keep the view frontal. Mouse translation gives nearby stars more parallax
+    // than distant ones, without rotating the camera or moving the form.
+    function cameraPose(travel) {
+      const parallax=travel;
+      return {
+        eye:[state.pointerX*100*parallax,state.pointerY*70*parallax,1100-travel*(5400+state.engagement*HOVER_TRAVEL)],
+        forward:[0,0,-1],right:[1,0,0],up:[0,1,0]
+      };
+    }
+    function hashBits(value) {
+      value=Math.imul(value^(value>>>16),0x7feb352d);
+      value=Math.imul(value^(value>>>15),0x846ca68b);
+      return (value^(value>>>16))>>>0;
+    }
+    function naturalCoordinates(x,y,phase,variation=1) {
+      // Smooth 3D density variation, with no shells or separate arriving clouds.
+      // Sequential, monotone axis warps keep density finite and preserve bounds.
+      x+=variation*(1-x*x)*(.14*Math.sin(2.6*x+1.7*y+2.1*phase)+.02*Math.sin(5.9*x-3.9*y+4.7*phase));
+      y+=variation*(1-y*y)*(.13*Math.sin(2.4*y-1.9*x+1.3*phase)+.02*Math.sin(6.3*y+3.2*x-3.1*phase));
+      return [x,y];
+    }
+    function cycleCoordinates(index,cycle,z,variation=1) {
+      const seed=(Math.imul(index,0x9e3779b9)+Math.imul(cycle,0x85ebca6b))>>>0;
+      return naturalCoordinates(hashBits(seed)/4294967296*2-1,hashBits(seed^0x68bc21eb)/4294967296*2-1,(RECYCLE_Z-z)/FLOW_DEPTH+cycle,variation);
+    }
+    function updateMassModel() {
+      const focal=state.height*FIELD_FOCAL*.5*OPTICAL_ZOOM;
+      const key=[massProfile,state.halfWidth,state.halfHeight,state.radius,focal].join(',');
+      if(key!==massModelKey){massModel=createProfileModel(state.halfWidth,state.halfHeight,state.radius,focal,massProfile);massModelKey=key;}
+    }
+    function randomSource(seed) {
+      return () => {seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+    }
+    function colorFromHsl(h,s,l) {
+      const f=n=>{const k=(n+h*12)%12;return l-s*Math.min(l,1-l)*Math.max(-1,Math.min(k-3,9-k,1));};
+      return [f(0),f(8),f(4)].map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));
+    }
+    const MAX_STARS=64000,MAX_GALAXIES=400,MAX_SOURCES=MAX_STARS+MAX_GALAXIES;
+    function createStarCloud() {
+      const random=randomSource(93571);
+      const data=new Float32Array(MAX_SOURCES*STAR_STRIDE);
+      for(let i=0;i<MAX_STARS;i++) {
+        // Every density setting samples the entire volume, not a depth prefix.
+        // A low-discrepancy Z phase avoids slabs, shells and synchronized returns.
+        const phase=(.137+i*.618033988749895)%1;
+        const x=random()*2-1,y=random()*2-1,z=RECYCLE_Z-phase*FLOW_DEPTH;
+        // Brightness and size are independent of depth: there is only one field.
+        const categorySize=random(),bright=i%5===0;
+        // Original Krea size/energy distributions within the continuous volume.
+        const size=bright?.35+Math.pow(random(),2)*3.3:.15+random()*.65;
+        const energy=bright?.05+Math.pow(random(),3)*8:.02+Math.pow(random(),2)*.2;
+        const rotation=random()*Math.PI*2, aspect=.8+random()*.9;
+        const category=random(),hue=category<.08?.06+random()*.08:category>.99?.83+random()*.1:.55+random()*.1;
+        const tint=colorFromHsl(hue,.5+random()*.35,.64+random()*.2);
+        // Stable membership: changing the large-star share never moves a particle.
+        const largeSize=6+(rotation*4.1)%1*5,largeEnergy=2.8+(rotation*8.3)%1*3.2;
+        data.set([x,y,z,...tint,size,energy,rotation,aspect,categorySize,largeSize,largeEnergy],i*STAR_STRIDE);
+      }
+      // Independent population: galaxy count never replaces or moves a star.
+      // Fixed IDs and low-discrepancy depths keep any count spread through space.
+      const galaxyRandom=randomSource(761203);
+      for(let i=0;i<MAX_GALAXIES;i++) {
+        const phase=(.379+i*.618033988749895)%1;
+        const x=galaxyRandom()*2-1,y=galaxyRandom()*2-1,z=RECYCLE_Z-phase*FLOW_DEPTH;
+        const seed=galaxyRandom(),rotation=galaxyRandom()*Math.PI*2,aspect=1.1+galaxyRandom()*2.9;
+        data.set([x,y,z,1,1,1,13+seed*5,2.2+seed*1.6,rotation,aspect,-(1+seed*.99),0,0],(MAX_STARS+i)*STAR_STRIDE);
+      }
+      return data;
+    }
+    const stars=createStarCloud();
+
+    // Krea's star sprites plus rare procedural extended sources, all sharing
+    // our camera, entrance and continuous flow through the physical lens.
+    const starVertex=`#version 300 es
+      precision highp float;
+      layout(location=0) in vec3 position;
+      layout(location=1) in vec3 color;
+      layout(location=2) in vec4 character;
+      layout(location=3) in vec3 population;
+      uniform vec3 camera, cameraRight, cameraUp, cameraForward;
+      uniform vec2 resolution, projectionCenter;
+      uniform vec4 sourceViewport;
+      uniform float arrival, elapsed, expansion, flowDistance, recyclePlane, largeStarFraction, pixelRatio, densityVariation;
+      uniform vec3 sourceDepths;
+      out vec3 tint;
+      out float energy, angle, aspect, spriteSize, foreground;
+      flat out int objectKind;
+      flat out float objectSeed;
+      uint hashBits(uint value) {
+        value^=value>>16u;value*=0x7feb352du;
+        value^=value>>15u;value*=0x846ca68bu;
+        return value^(value>>16u);
+      }
+      vec2 naturalCoordinates(vec2 p,float phase) {
+        p.x+=densityVariation*(1.0-p.x*p.x)*(.14*sin(2.6*p.x+1.7*p.y+2.1*phase)+.02*sin(5.9*p.x-3.9*p.y+4.7*phase));
+        p.y+=densityVariation*(1.0-p.y*p.y)*(.13*sin(2.4*p.y-1.9*p.x+1.3*phase)+.02*sin(6.3*p.y+3.2*p.x-3.1*phase));
+        return p;
+      }
+      void main() {
+        vec3 birthplace=vec3(0.0,0.0,-4900.0);
+        vec2 volumeHalfSize=vec2(resolution.x/resolution.y,1.0)*${(FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING).toFixed(8)};
+        vec3 world=mix(birthplace,vec3(position.xy*volumeHalfSize,position.z),expansion);
+        world.z+=flowDistance;
+        float cycle=max(0.0,ceil((world.z-recyclePlane)/${FLOW_DEPTH.toFixed(1)}));
+        world.z-=cycle*${FLOW_DEPTH.toFixed(1)};
+        vec2 fieldXY=position.xy;
+        if(cycle>0.0) {
+          uint seed=uint(gl_VertexID)*0x9e3779b9u+uint(cycle)*0x85ebca6bu;
+          fieldXY=vec2(float(hashBits(seed)),float(hashBits(seed^0x68bc21ebu)))/4294967296.0*2.0-1.0;
+        }
+        world.xy=naturalCoordinates(fieldXY,(-4000.0-position.z)/${FLOW_DEPTH.toFixed(1)}+cycle)*volumeHalfSize*expansion;
+        vec3 ray=world-camera;
+        vec3 view=vec3(dot(ray,cameraRight),dot(ray,cameraUp),dot(ray,cameraForward));
+        view.xy/=${OPTICAL_ZOOM.toFixed(1)};
+        float focal=${FIELD_FOCAL*OPTICAL_ZOOM},distance=max(1.0,view.z);
+        gl_Position=vec4(view.x*focal*resolution.y/resolution.x,view.y*focal,1.002002*view.z-60.06006,view.z);
+        // Off-axis projection: the forward vanishing point follows the input.
+        // Shift in clip space, preserving frontal motion and depth parallax.
+        gl_Position.xy+=(projectionCenter/resolution*2.0-1.0)*gl_Position.w;
+        // Keep sources beyond the visible viewport: a strong lens can bring
+        // their images into view. Each depth slice has its own source bounds.
+        gl_Position.xy=gl_Position.xy*resolution/sourceViewport.zw
+          +(resolution-2.0*sourceViewport.xy-sourceViewport.zw)/sourceViewport.zw*gl_Position.w;
+        objectKind=population.x<0.0?int(floor(-population.x)):0;
+        objectSeed=fract(-population.x);
+        float large=(1.0-step(largeStarFraction,population.x))*step(0.0,population.x);
+        vec4 star=vec4(mix(character.xy,population.yz,large),character.zw);
+        float diameter=clamp(star.x*1400.0/distance,.45,objectKind==0?3.8:7.0);
+        foreground=arrival*smoothstep(1.2,2.0,diameter)*(1.0-smoothstep(1800.0,3200.0,distance));
+        spriteSize=diameter*7.0+5.0;
+        gl_PointSize=spriteSize*pixelRatio;
+        energy=star.y*smoothstep(100.0,400.0,distance);
+        float layerWeight;
+        if(distance<sourceDepths.y)layerWeight=sourceDepths.x>0.0
+          ?clamp((1.0/distance-1.0/sourceDepths.x)/(1.0/sourceDepths.y-1.0/sourceDepths.x),0.0,1.0):1.0;
+        else layerWeight=sourceDepths.z>0.0
+          ?clamp((1.0/distance-1.0/sourceDepths.z)/(1.0/sourceDepths.y-1.0/sourceDepths.z),0.0,1.0):1.0;
+        energy*=layerWeight;
+        if(layerWeight==0.0){gl_Position=vec4(2.0,2.0,2.0,1.0);gl_PointSize=1.0;}
+        energy*=1.0+float(objectKind==0)*arrival*step(.88,fract(star.z*7.13))*step(1.0,star.y)
+          *(sin(elapsed*(.7+star.w)+star.z)*.25+sin(elapsed*2.3+star.z*4.0)*.12);
+        // Preserve the sparse birth and individual far-plane fade already tuned here.
+        float seed=fract(character.z*7.13);
+        float birth=mix(1.0,smoothstep(.08+seed*.42,.48+seed*.52,expansion),step(.025,seed));
+        energy*=birth*mix(.45,1.0,smoothstep(.1,.9,expansion));
+        energy*=smoothstep(recyclePlane-${FLOW_DEPTH.toFixed(1)},recyclePlane-${(FLOW_DEPTH-1600).toFixed(1)},world.z);
+        tint=color;angle=star.z;aspect=star.w;
+      }
+    `;
+    const starFragment=`#version 300 es
+      precision highp float;
+      in vec3 tint;
+      in float energy, angle, aspect, spriteSize, foreground;
+      flat in int objectKind;
+      flat in float objectSeed;
+      uniform float storageScale;
+      out vec4 outputColor;
+      void main() {
+        vec2 pixel=(gl_PointCoord-.5)*spriteSize;
+        float pinpoint=exp(-dot(pixel,pixel)*.5);
+        vec2 p=gl_PointCoord*2.0-1.0;
+        p=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*p;
+        p*=vec2(inversesqrt(aspect),sqrt(aspect));
+        if(objectKind==1) {
+          float r=length(p),theta=atan(p.y,p.x+.000001);
+          float arms=pow(.5+.5*cos(theta*2.0-log(r+.08)*9.0+objectSeed*6.28),2.0);
+          float spiral=step(.32,objectSeed);
+          float disk=exp(-r*7.0)*(.2+spiral*arms*.22);
+          float nucleus=exp(-r*r*105.0)*.72;
+          vec3 light=vec3(1.0,.87,.68)*nucleus+mix(vec3(.8,.85,1.0),vec3(.62,.8,1.0),spiral)*disk;
+          light*=1.0-smoothstep(.65,1.0,length(gl_PointCoord*2.0-1.0));
+          outputColor=vec4(light*energy*storageScale,1.0);return;
+        }
+        float core=exp(-dot(p,p)*65.0);
+        vec2 shoulder=p-vec2(.055,.025);
+        float light=core+exp(-dot(shoulder,shoulder)*35.0)*.22
+          +exp(-dot(p,p)*20.0)*.08+exp(-dot(p,p)*6.0)*.004;
+        outputColor=vec4((tint*light+vec3(1.0)*pinpoint*foreground*3.0)*energy*storageScale,1.0);
+      }
+    `;
+    const screenVertex=`#version 300 es
+      precision highp float;
+      out vec2 textureUV;
+      void main() {
+        vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));
+        textureUV=p;
+        gl_Position=vec4(p*2.0-1.0,0.0,1.0);
+      }
+    `;
+    // Integrate the weak-field ray equation through a positive 3D mass density.
+    // The finite-endpoint integral is analytic per quadrature cell (Born order).
+    const fieldFragment=`#version 300 es
+      precision highp float;
+      uniform sampler2D massCells;
+      uniform int cellCount;
+      uniform float softening, focal, sourceDepth;
+      uniform vec2 resolution, projectionCenter;
+      in vec2 textureUV;
+      out vec4 result;
+      void main() {
+        vec2 p=textureUV*resolution-projectionCenter;
+        vec3 n=normalize(vec3(p/focal,1.0));
+        float depth=sourceDepth/${LENS_DEPTH.toFixed(1)},S=depth/n.z;
+        vec3 shift=vec3(0.0);
+        for(int i=0;i<4096;i++) {
+          if(i>=cellCount)break;
+          vec4 cell=texelFetch(massCells,ivec2(i,0),0);
+          float h=dot(n,cell.xyz);
+          vec3 b=n*h-cell.xyz;
+          float B2=dot(b,b)+softening*softening;
+          float r0=sqrt(B2+h*h),rs=sqrt(B2+(S-h)*(S-h));
+          float A=r0*r0-S*h;
+          float integral=A>=0.0?S*S/(r0*(rs*r0+A)):(rs*r0-A)/(B2*r0);
+          shift-=2.0*cell.w*b*integral;
+        }
+        vec2 displacement=focal/depth*(shift.xy-n.xy/n.z*shift.z);
+        result=vec4(displacement,0.0,1.0);
+      }
+    `;
+    const lensFragment=`#version 300 es
+      precision highp float;
+      precision highp sampler2DArray;
+      uniform sampler2DArray starImage, rayField, introField;
+      uniform sampler2D accumulatedLight;
+      uniform int renderStage;
+      uniform vec2 resolution, probeSource;
+      uniform vec4 searchBox;
+      uniform float cornerRadius, mass, storageScale, pulseAge, probeMode, probeDepth, arrival;
+      uniform float localStrength, localWidth, elapsed;
+      uniform float introProgress;
+      uniform float sourcePlanes[${DEPTHS.length}];
+      uniform float activeLayers[${DEPTHS.length}];
+      uniform float sourceSlots[${DEPTHS.length}];
+      uniform vec4 sourceViewports[${DEPTHS.length}];
+      uniform bool fieldLinear, gridEnabled, rimEnabled, introEnabled, maskOpaque;
+      uniform int gridLayer;
+      in vec2 textureUV;
+      out vec4 outputColor;
+      float roundedDistance(vec2 p) {
+        vec2 q=abs(p)-searchBox.zw+cornerRadius;
+        return length(max(q,0.0))+min(max(q.x,q.y),0.0)-cornerRadius;
+      }
+      vec2 boxNormal(vec2 p) {
+        vec2 q=abs(p)-searchBox.zw+cornerRadius,outer=max(q,0.0);
+        if(length(outer)>.001)return sign(p)*normalize(outer);
+        return q.x>q.y?vec2(sign(p.x+.00001),0.0):vec2(0.0,sign(p.y+.00001));
+      }
+      float gridLines(vec2 p,float spacing,float width) {
+        vec2 derivative=max(fwidth(p),vec2(.001));
+        vec2 distance=abs(fract(p/spacing+.5)-.5)*spacing;
+        vec2 coverage=clamp((vec2(width*.5)-distance)/derivative+.5,0.0,1.0);
+        // When several source cells fit in one pixel, fade to average coverage.
+        vec2 filtered=mix(coverage,vec2(width/spacing),smoothstep(spacing*.3,spacing,derivative));
+        return 1.0-(1.0-filtered.x)*(1.0-filtered.y);
+      }
+      float probeWeight(int i) {
+        float current=sourcePlanes[i];
+        if(probeDepth<current)return i==0?1.0:clamp((1.0/probeDepth-1.0/sourcePlanes[i-1])/(1.0/current-1.0/sourcePlanes[i-1]),0.0,1.0);
+        return i==${DEPTHS.length-1}?1.0:clamp((1.0/probeDepth-1.0/sourcePlanes[i+1])/(1.0/current-1.0/sourcePlanes[i+1]),0.0,1.0);
+      }
+      vec3 sourceLight(vec2 uv,int layer) {
+        if(probeMode>.5) {
+          vec2 delta=(uv*resolution-searchBox.xy-probeSource)/2.0;
+          return vec3(1.4,2.1,3.2)*exp(-.5*dot(delta,delta))*probeWeight(layer);
+        }
+        vec4 viewport=sourceViewports[layer];
+        vec2 sourceUv=(uv*resolution-viewport.xy)/viewport.zw;
+        vec2 bounds=min(sourceUv,1.0-sourceUv)*viewport.zw;
+        return texture(starImage,vec3(clamp(sourceUv,0.0,1.0),sourceSlots[layer])).rgb/storageScale
+          *smoothstep(0.0,2.0,min(bounds.x,bounds.y));
+      }
+      vec3 linearToDisplay(vec3 c) {
+        c=c/(1.0+c);
+        return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-.055,step(vec3(.0031308),c));
+      }
+      vec2 readRayField(sampler2DArray field,vec2 uv,int layer) {
+        if(fieldLinear)return texture(field,vec3(uv,float(layer))).xy;
+        ivec2 size=textureSize(field,0).xy;
+        vec2 grid=uv*vec2(size)-.5,f=fract(grid);
+        ivec2 p=ivec2(floor(grid)),hi=size-1;
+        vec2 a=texelFetch(field,ivec3(clamp(p,ivec2(0),hi),layer),0).xy;
+        vec2 b=texelFetch(field,ivec3(clamp(p+ivec2(1,0),ivec2(0),hi),layer),0).xy;
+        vec2 c=texelFetch(field,ivec3(clamp(p+ivec2(0,1),ivec2(0),hi),layer),0).xy;
+        vec2 d=texelFetch(field,ivec3(clamp(p+ivec2(1,1),ivec2(0),hi),layer),0).xy;
+        return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+      }
+      vec2 sampleRayField(vec2 uv,int layer) {
+        if(!introEnabled||introProgress>=1.0)return readRayField(rayField,uv,layer);
+        float frame=clamp(introProgress,0.0,1.0)*8.0;
+        int key=min(7,int(floor(frame)));
+        vec2 a=readRayField(introField,uv,key*${DEPTHS.length}+layer);
+        vec2 b=key==7?readRayField(rayField,uv,layer):readRayField(introField,uv,(key+1)*${DEPTHS.length}+layer);
+        // Interpolate the ray map, never two already-rendered star images.
+        return mix(a,b,fract(frame));
+      }
+      float localEnvelope(float distance) {
+        // Cubic decay concentrates the boost near the form: 12.5% halfway,
+        // 0.1% at 90% of the width. Value, slope and curvature vanish outside.
+        float t=clamp(distance/max(localWidth,.001),0.0,1.0);
+        float s=1.0-t;
+        return s*s*s;
+      }
+      vec2 sourceUV(vec2 viewUV,int layer,float localWeight) {
+        vec2 shift=sampleRayField(viewUV,layer)*mass;
+        if(localStrength>0.0&&localWeight>0.0) {
+          // Amplify the existing depth-dependent deflection in its own direction.
+          // A smooth cap avoids dragging a distant source hundreds of pixels
+          // across a narrow band at high physical mass. Width controls reach
+          // independently from strength. No new stars are created.
+          float cap=${LOCAL_LENS_SHIFT_LIMIT.toFixed(1)};
+          float gain=localStrength*localWeight*inversesqrt(1.0+dot(shift,shift)/(cap*cap));
+          shift+=shift*gain;
+        }
+        return viewUV+shift/resolution;
+      }
+      void main() {
+        vec2 screenOffset=textureUV*resolution-searchBox.xy;
+        float edge=roundedDistance(screenOffset),outside=max(edge,0.0);
+        // These pixels are completely hidden by the opaque HTML form. Keep
+        // a 4px guard so derivative quads at the visible rim are untouched.
+        if(maskOpaque&&edge< -4.0){outputColor=vec4(0.0,0.0,0.0,renderStage==1?0.0:1.0);return;}
+        // Anchor support to the visible form, even while the click wave passes.
+        float localWeight=localEnvelope(outside);
+        float envelope=smoothstep(0.0,.06,pulseAge)*(1.0-smoothstep(.65,1.9,pulseAge));
+        float waveEdge=outside-pulseAge*230.0;
+        float pulse=exp(-pow(waveEdge/(20.0+max(pulseAge,0.0)*7.0),2.0))*envelope;
+        // Transient interaction wave is composed before the static physical map.
+        // It does not change the fitted mass or add another population of stars.
+        vec2 viewUV=textureUV-boxNormal(screenOffset)*pulse*${WAVE_SHIFT.toFixed(1)}*arrival/resolution;
+        vec3 light=renderStage==2?texture(accumulatedLight,textureUV).rgb:vec3(0.0);
+        if(renderStage!=2)for(int i=0;i<${DEPTHS.length};i++) {
+          // Empty source slices contribute no radiance. Keep all physical
+          // depths, but avoid fetching their textures for every screen pixel.
+          if((renderStage==1||probeMode<.5)&&activeLayers[i]<.5)continue;
+          vec2 uv=sourceUV(viewUV,i,localWeight);
+          vec2 dx=dFdx(uv)*.25,dy=dFdy(uv)*.25;
+          vec2 pixels=probeMode>.5?resolution:resolution/sourceViewports[i].zw*vec2(textureSize(starImage,0).xy);
+          if(max(length(dx*pixels),length(dy*pixels))>.26) {
+            light+=(sourceLight(uv-dx-dy,i)+sourceLight(uv+dx-dy,i)
+              +sourceLight(uv-dx+dy,i)+sourceLight(uv+dx+dy,i))*.25;
+          } else light+=sourceLight(uv,i);
+        }
+        // Add physical source batches in linear HDR. Grid, wave colour and
+        // display conversion happen exactly once after all depths are summed.
+        if(renderStage==1){outputColor=vec4(light,0.0);return;}
+        if(rimEnabled&&probeMode<.5) {
+          // The Einstein variant's broad animated halo. Decorative light only:
+          // it never changes the ray map or gathers extra stars onto the rim.
+          vec2 orbitPosition=screenOffset/max(searchBox.zw,vec2(1.0));
+          float orbit=atan(orbitPosition.y,orbitPosition.x)+elapsed*.56;
+          float flow=.12+1.4*pow(.5+.32*sin(orbit*2.0)+.18*sin(orbit*5.0),2.0);
+          float flare=max(exp(-outside/20.0)-exp(-5.0),0.0)*.035*flow;
+          light+=arrival*smoothstep(-.5,.5,edge)*vec3(.5,.72,1.0)*flare;
+        }
+        if(gridEnabled) {
+          // Source-plane Cartesian grid uses exactly the same inverse ray map.
+          vec2 source=sourceUV(viewUV,gridLayer,localWeight)*resolution-searchBox.xy;
+          float minor=gridLines(source,40.0,1.0),major=gridLines(source,160.0,1.3);
+          light=light*.3+vec3(.055,.25,.42)*minor+vec3(.1,.38,.58)*major;
+        }
+        float pixel=max(fwidth(outside),.001);
+        float line=clamp((waveEdge+.3)/pixel+.5,0.0,1.0)-clamp((waveEdge-.3)/pixel+.5,0.0,1.0);
+        // Keep the color edge only 0.6 CSS px wide; the displacement is broader.
+        light+=arrival*smoothstep(-.5,.5,edge)*vec3(.5,.72,1.0)*line*envelope*.12;
+        outputColor=vec4(linearToDisplay(light),1.0);
+      }
+    `;
+    function compileProgram(vertex,fragment) {
+      const shaders=[gl.VERTEX_SHADER,gl.FRAGMENT_SHADER].map((type,i)=>{
+        const shader=gl.createShader(type);gl.shaderSource(shader,[vertex,fragment][i]);gl.compileShader(shader);
+        if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(shader));
+        return shader;
+      });
+      const program=gl.createProgram();shaders.forEach(shader=>gl.attachShader(program,shader));gl.linkProgram(program);
+      shaders.forEach(shader=>gl.deleteShader(shader));
+      if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
+      return program;
+    }
+    function locations(program,names){return Object.fromEntries(names.split(' ').map(name=>[name,gl.getUniformLocation(program,name)]));}
+    function initWebGL() {
+      gl=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:false,stencil:false,powerPreference:'high-performance'});
+      if(!gl||!gl.getExtension('EXT_color_buffer_float'))throw new Error('Floating-point WebGL 2 is unavailable');
+      const fieldLinear=!!gl.getExtension('OES_texture_float_linear');
+      const profiler=null;
+      const starsProgram=compileProgram(starVertex,starFragment),lensProgram=compileProgram(screenVertex,lensFragment),fieldProgram=compileProgram(screenVertex,fieldFragment);
+      const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowDistance recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
+      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox cornerRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
+      const fieldU=locations(fieldProgram,'massCells cellCount softening focal sourceDepth resolution projectionCenter');
+      const starVAO=gl.createVertexArray(),screenVAO=gl.createVertexArray();gl.bindVertexArray(starVAO);
+      const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,stars,gl.STATIC_DRAW);
+      [3,3,4,3].forEach((size,index)=>{gl.enableVertexAttribArray(index);gl.vertexAttribPointer(index,size,gl.FLOAT,false,STAR_STRIDE*4,[0,12,24,40][index]);});
+      const buckets=new StarDepthBuckets(DEPTHS,MAX_SOURCES),indices=gl.createBuffer();
+      const recycleCycles=new Int32Array(MAX_SOURCES).fill(-1),recycleXY=new Float64Array(MAX_SOURCES*2);
+      const coordinateCache={variation:NaN};
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,buckets.indices.byteLength,gl.DYNAMIC_DRAW);
+      const starTexture=gl.createTexture(),fieldTexture=gl.createTexture(),massTexture=gl.createTexture(),target=gl.createFramebuffer();
+      const lightTexture=gl.createTexture(),lightTarget=gl.createFramebuffer();
+      const introTexture=gl.createTexture(),boundsTexture=gl.createTexture();
+      let introKey='',introBounds=null,introMassKey='',introWidth=1,introHeight=1;
+      const boundsProgram=compileProgram(screenVertex,`#version 300 es
+        precision highp float;
+        precision highp sampler2DArray;
+        uniform sampler2DArray fields;
+        uniform int tileSize;
+        uniform vec2 resolution;
+        uniform float mass,reach;
+        uniform vec4 boxes[8];
+        uniform float radii[8];
+        out vec4 result;
+        void main(){
+          ivec3 size=textureSize(fields,0);int rows=(size.y+tileSize-1)/tileSize;
+          ivec2 tile=ivec2(gl_FragCoord.xy);int slice=tile.y/rows,layer=slice%size.z;
+          bool localOnly=slice>=size.z;int key=layer/24;
+          ivec2 base=ivec2(tile.x,tile.y%rows)*tileSize;
+          vec4 box=boxes[key];float radius=radii[key];
+          vec2 lo=vec2(1e20),hi=vec2(-1e20);
+          for(int y=0;y<tileSize;y++)for(int x=0;x<tileSize;x++){
+            ivec2 p=base+ivec2(x,y);if(p.x>=size.x||p.y>=size.y)continue;
+            vec2 screen=(vec2(p)+.5)/vec2(size.xy)*resolution;
+            vec2 q=abs(screen-box.xy)-box.zw+radius;
+            float distance=length(max(q,0.0))+min(max(q.x,q.y),0.0)-radius;
+            if(localOnly&&distance>reach)continue;
+            vec2 value=screen+texelFetch(fields,ivec3(p,layer),0).xy*mass;
+            // Include zero mass as well as full mass for the lens birth.
+            lo=min(lo,min(screen,value));hi=max(hi,max(screen,value));
+          }
+          result=vec4(lo,hi);
+        }`);
+      const batchActive=new Float32Array(DEPTHS.length),sourceSlots=new Float32Array(DEPTHS.length);
+      let targetKey='',sourceSizingKey='',lightKey='',fieldKey='',targetWidth=0,targetHeight=0;
+      let sourceBoundsKey='',fieldWidth=0,fieldHeight=0;
+      const fieldSamples=[],sourceViewports=new Float32Array(DEPTHS.length*4);
+      const updateSourceBounds=()=>{
+        const key=fieldKey+','+settingsValue.gravity+','+(state.intro?.progress<1?'intro':'steady');
+        if(key===sourceBoundsKey)return;
+        if(state.intro?.progress<1&&introKey===fieldKey&&introMassKey!==String(settingsValue.gravity*fieldMassScale))reduceIntroBounds();
+        const W=state.width,H=state.height,mass=settingsValue.gravity*fieldMassScale;
+        // Reserve both ends of the focus animation once. Intermediate masses
+        // are linear combinations, so focusing never resizes source textures.
+        const massRange=[0,mass,FOCUS_MASS*fieldMassScale];
+        // Only rays in the largest possible local band can receive its extra
+        // 360px displacement. Reserving it around the entire screen wastes
+        // source texels and makes every star look magnified from a tiny bitmap.
+        const cellSpan=Math.hypot(W/fieldWidth,H/fieldHeight),localSupport=new Uint8Array(fieldWidth*fieldHeight);
+        const reach=150+WAVE_SHIFT+cellSpan;
+        for(let y=0;y<fieldHeight;y++)for(let x=0;x<fieldWidth;x++){
+          const qx=Math.abs((x+.5)/fieldWidth*W-state.centerX)-state.halfWidth+state.radius;
+          const qy=Math.abs((y+.5)/fieldHeight*H-(H-state.centerY))-state.halfHeight+state.radius;
+          const d=Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0)-state.radius;
+          localSupport[y*fieldWidth+x]=d<=reach?1:0;
+        }
+        for(let layer=0;layer<DEPTHS.length;layer++) {
+          let left=0,bottom=0,right=W,top=H;
+          let localLeft=Infinity,localBottom=Infinity,localRight=-Infinity,localTop=-Infinity;
+          const data=fieldSamples[layer];
+          for(let y=0;y<fieldHeight;y++)for(let x=0;x<fieldWidth;x++) {
+            const i=(y*fieldWidth+x)*4;
+            for(const activeMass of massRange){
+              const sx=(x+.5)/fieldWidth*W+data[i]*activeMass,sy=(y+.5)/fieldHeight*H+data[i+1]*activeMass;
+              left=Math.min(left,sx);right=Math.max(right,sx);bottom=Math.min(bottom,sy);top=Math.max(top,sy);
+              if(localSupport[y*fieldWidth+x]){
+                localLeft=Math.min(localLeft,sx);localRight=Math.max(localRight,sx);localBottom=Math.min(localBottom,sy);localTop=Math.max(localTop,sy);
+              }
+            }
+          }
+          const reserve=LOCAL_LENS_SHIFT_LIMIT*LOCAL_LENS_MAX_STRENGTH;
+          if(state.intro?.progress<1&&introBounds){
+            // The union covers every interpolated keyframe without rebuilding
+            // source textures each animation frame. Include the moving centre.
+            const j=layer*8;
+            left=Math.min(left,introBounds[j]);right=Math.max(right,introBounds[j+2]);
+            bottom=Math.min(bottom,introBounds[j+1]);top=Math.max(top,introBounds[j+3]);
+            localLeft=Math.min(localLeft,introBounds[j+4]);localRight=Math.max(localRight,introBounds[j+6]);
+            localBottom=Math.min(localBottom,introBounds[j+5]);localTop=Math.max(localTop,introBounds[j+7]);
+          }
+          left=Math.min(left,localLeft-reserve);right=Math.max(right,localRight+reserve);
+          bottom=Math.min(bottom,localBottom-reserve);top=Math.max(top,localTop+reserve);
+          const cx=(left+right)*.5,cy=(bottom+top)*.5;
+          // Reserve the largest local offset once, also at zero boost. Moving
+          // the boost slider then cannot change source resolution outside its band.
+          const padding=2*WAVE_SHIFT+4+2*cellSpan;
+          const scale=Math.max((right-left+padding)/W,(top-bottom+padding)/H);
+          sourceViewports.set([cx-W*scale*.5,cy-H*scale*.5,W*scale,H*scale],layer*4);
+        }
+        sourceBoundsKey=key;
+      };
+      const setupArray=(texture,width,height,fullPrecision=false,depth=DEPTHS.length)=>{
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY,texture);
+        const filter=fullPrecision&&!fieldLinear?gl.NEAREST:gl.LINEAR;
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,filter);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,filter);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+        // Ray maps contain only XY displacement. RG32F keeps identical float32
+        // precision while halving their GPU storage; source light stays RGBA16F.
+        gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,fullPrecision?gl.RG32F:gl.RGBA16F,width,height,depth,0,fullPrecision?gl.RG:gl.RGBA,fullPrecision?gl.FLOAT:gl.HALF_FLOAT,null);
+      };
+      // A complete placeholder keeps the optional sampler valid after a direct
+      // visit to an already-finished scene or in reduced-motion mode.
+      setupArray(introTexture,1,1,true,1);
+      const reduceIntroBounds=()=>{
+        const w=introWidth,h=introHeight,count=GravityIntro.KEYFRAMES,depth=DEPTHS.length;
+        const cols=Math.ceil(w/16),rows=Math.ceil(h/16),totalRows=rows*count*depth*2;
+        gl.bindFramebuffer(gl.FRAMEBUFFER,target);gl.bindVertexArray(screenVAO);gl.disable(gl.BLEND);
+        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,introTexture);
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,boundsTexture);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,cols,totalRows,0,gl.RGBA,gl.FLOAT,null);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,boundsTexture,0);
+        gl.useProgram(boundsProgram);
+        const u=locations(boundsProgram,'fields tileSize mass resolution reach boxes[0] radii[0]');
+        const boxes=[],radii=[];
+        for(let key=0;key<count;key++){
+          const s=GravityIntro.shape(state,state.width,state.height,key/count);
+          boxes.push(s.centerX,state.height-s.centerY,s.halfWidth,s.halfHeight);radii.push(s.radius);
+        }
+        const drift=Math.hypot(state.centerX-state.width*.5,state.centerY-state.height*.5);
+        gl.uniform1i(u.fields,3);gl.uniform1i(u.tileSize,16);gl.uniform1f(u.mass,settingsValue.gravity*fieldMassScale);
+        gl.uniform2f(u.resolution,state.width,state.height);gl.uniform4fv(u['boxes[0]'],boxes);gl.uniform1fv(u['radii[0]'],radii);
+        gl.uniform1f(u.reach,150+WAVE_SHIFT+Math.hypot(state.width/w,state.height/h)+(state.halfWidth-state.halfHeight+drift)/count);
+        gl.viewport(0,0,cols,totalRows);gl.drawArrays(gl.TRIANGLES,0,3);
+        const tiles=new Float32Array(cols*totalRows*4);gl.readPixels(0,0,cols,totalRows,gl.RGBA,gl.FLOAT,tiles);
+        if(gl.getError()!==gl.NO_ERROR)throw new Error('Intro field bounds unavailable');
+        introBounds=new Float32Array(depth*8);
+        for(let layer=0;layer<depth;layer++)for(let local=0;local<2;local++){
+          const j=layer*8+local*4;introBounds.set([Infinity,Infinity,-Infinity,-Infinity],j);
+          for(let key=0;key<count;key++)for(let tile=0;tile<cols*rows;tile++){
+            const i=(((local*count+key)*depth+layer)*cols*rows+tile)*4;
+            introBounds[j]=Math.min(introBounds[j],tiles[i]);introBounds[j+1]=Math.min(introBounds[j+1],tiles[i+1]);
+            introBounds[j+2]=Math.max(introBounds[j+2],tiles[i+2]);introBounds[j+3]=Math.max(introBounds[j+3],tiles[i+3]);
+          }
+        }
+        introMassKey=String(settingsValue.gravity*fieldMassScale);
+        gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
+      };
+      const prepareIntroFields=()=>{
+        if(introKey===fieldKey)return;
+        const started=performance.now(),count=GravityIntro.KEYFRAMES,depth=DEPTHS.length;
+        const w=Math.min(320,Math.floor(Math.sqrt(60000*state.width/state.height))),h=Math.max(64,Math.round(w*state.height/state.width));
+        introWidth=w;introHeight=h;
+        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,introTexture);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,fieldLinear?gl.LINEAR:gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,fieldLinear?gl.LINEAR:gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+        gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RG32F,w,h,count*depth,0,gl.RG,gl.FLOAT,null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER,target);gl.useProgram(fieldProgram);gl.bindVertexArray(screenVAO);gl.disable(gl.BLEND);gl.viewport(0,0,w,h);
+        gl.uniform1i(fieldU.massCells,0);gl.uniform1f(fieldU.focal,massModel.focal);gl.uniform2f(fieldU.resolution,state.width,state.height);
+        const coarse=GravityIntro.coarsen(massModel);
+        canvas.dataset.introCells=String(coarse.count);
+        for(let key=0;key<count;key++){
+          const progress=key/count,model=GravityIntro.massAt(massModel,coarse,progress),shape=GravityIntro.shape(state,state.width,state.height,progress);
+          gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,massTexture);
+          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,model.count,1,0,gl.RGBA,gl.FLOAT,model.samples);
+          gl.uniform1i(fieldU.cellCount,model.count);gl.uniform1f(fieldU.softening,model.epsilon);
+          gl.uniform2f(fieldU.projectionCenter,shape.centerX,state.height-shape.centerY);
+          for(let layer=0;layer<depth;layer++){
+            gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,introTexture,0,key*depth+layer);
+            if(key===0&&layer===0&&gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Intro field target unavailable');
+            gl.uniform1f(fieldU.sourceDepth,DEPTHS[layer]);gl.drawArrays(gl.TRIANGLES,0,3);
+          }
+        }
+        // Reduce 16x16 tiles on the GPU: one small readback, not 192 full maps.
+        reduceIntroBounds();
+        introKey=fieldKey;sourceBoundsKey='';
+        canvas.dataset.introPreparationMs=(performance.now()-started).toFixed(1);
+        canvas.dataset.introMapSize=w+'x'+h;
+        gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
+      };
+      const resizeSources=()=>{
+        const sizingKey=sourceBoundsKey+','+canvas.width+','+canvas.height;
+        if(sizingKey===sourceSizingKey)return;
+        let viewScale=1;
+        for(let i=0;i<DEPTHS.length;i++)viewScale=Math.max(viewScale,sourceViewports[i*4+3]/state.height);
+        const maxTexture=gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        const scale=Math.min(viewScale,maxTexture/canvas.width,maxTexture/canvas.height,Math.sqrt(320*1024*1024/(canvas.width*canvas.height*SOURCE_BATCH_SIZE*8)));
+        const width=Math.max(1,Math.floor(canvas.width*scale)),height=Math.max(1,Math.floor(canvas.height*scale));
+        const key=width+','+height;
+        if(key!==targetKey){setupArray(starTexture,width,height,false,SOURCE_BATCH_SIZE);targetWidth=width;targetHeight=height;targetKey=key;}
+        canvas.dataset.sourcePixelRatio=(targetHeight/(state.height*viewScale)).toFixed(3);
+        sourceSizingKey=sizingKey;
+      };
+      resizeTarget=()=>{
+        updateMassModel();
+        const key=[canvas.width,canvas.height].join(',');
+        if(lightKey!==key) {
+          gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,lightTexture);
+          gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,canvas.width,canvas.height,0,gl.RGBA,gl.HALF_FLOAT,null);
+          gl.bindFramebuffer(gl.FRAMEBUFFER,lightTarget);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,lightTexture,0);
+          if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('HDR accumulation target unavailable');
+          lightKey=key;
+        }
+        const nextFieldKey=[massModelKey,state.width,state.height,state.centerX,state.centerY].join(',');
+        if(fieldKey!==nextFieldKey) {
+          fieldWidth=384;fieldHeight=Math.max(128,Math.round(fieldWidth*state.height/state.width));
+          setupArray(fieldTexture,fieldWidth,fieldHeight,true);
+          canvas.dataset.fieldMapBytes=String(fieldWidth*fieldHeight*DEPTHS.length*8);
+          gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,massTexture);
+          gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+          gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,massModel.count,1,0,gl.RGBA,gl.FLOAT,massModel.samples);
+          gl.useProgram(fieldProgram);gl.bindVertexArray(screenVAO);gl.disable(gl.BLEND);
+          gl.uniform1i(fieldU.massCells,0);gl.uniform1i(fieldU.cellCount,massModel.count);
+          gl.uniform1f(fieldU.softening,massModel.epsilon);gl.uniform1f(fieldU.focal,massModel.focal);
+          gl.uniform2f(fieldU.resolution,state.width,state.height);gl.uniform2f(fieldU.projectionCenter,state.centerX,state.height-state.centerY);
+          gl.bindFramebuffer(gl.FRAMEBUFFER,target);gl.viewport(0,0,fieldWidth,fieldHeight);
+          for(let i=0;i<DEPTHS.length;i++) {
+            gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,fieldTexture,0,i);
+            if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('Physical field target unavailable');
+            gl.uniform1f(fieldU.sourceDepth,DEPTHS[i]);gl.drawArrays(gl.TRIANGLES,0,3);
+            const data=new Float32Array(fieldWidth*fieldHeight*4);
+            gl.readPixels(0,0,fieldWidth,fieldHeight,gl.RGBA,gl.FLOAT,data);
+            if(gl.getError()!==gl.NO_ERROR)throw new Error('Physical field readback unavailable');
+            fieldSamples[i]=data;
+          }
+          // Calibrate at the original 180% reference, even with a 400% slider.
+          // Higher values genuinely increase mass and may cross critical curves. All rays
+          // still use the original integral; no local displacement is clamped.
+          fieldMassScale=massProfile==='original'?1:GravityCalibration.calibrateMass(fieldSamples,fieldWidth,fieldHeight,{
+            screenWidth:state.width,screenHeight:state.height,centerX:state.centerX,centerY:state.height-state.centerY,
+            halfWidth:state.halfWidth,halfHeight:state.halfHeight,radius:state.radius
+          }).scale;
+          fieldKey=nextFieldKey;
+        }
+        if(state.intro.progress<1)prepareIntroFields();
+        gl.bindFramebuffer(gl.FRAMEBUFFER,null);canvas.dataset.hdr='true';
+      };
+      renderer=()=>{
+        if(gl.isContextLost())return;
+        if(state.intro.progress<1)prepareIntroFields();
+        profiler?.begin();
+        updateSourceBounds();
+        resizeSources();
+        const motion=motionAt(state.time),camera=cameraPose(motion.progress),arrival=state.formReveal;
+        buckets.reset();
+        const projection=state.lensShape||state;
+        const densityVariation=1-settingsValue.uniformity;
+        if(coordinateCache.variation!==densityVariation){recycleCycles.fill(-1);coordinateCache.variation=densityVariation;}
+        if(!probe.enabled) {
+          const starTotal=starCount(),count=starTotal+settingsValue.galaxies,expansion=motion.progress,flow=motion.flow;
+          const plane=Math.max(RECYCLE_Z,camera.eye[2]+100),focal=state.height*FIELD_FOCAL*.5;
+          const halfY=FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING,halfX=halfY*state.width/state.height;
+          for(let ordinal=0;ordinal<count;ordinal++) {
+            const i=ordinal<starTotal?ordinal:MAX_STARS+ordinal-starTotal;
+            const offset=i*STAR_STRIDE;
+            let z=-4900+(stars[offset+2]+4900)*expansion+flow;
+            const cycle=Math.max(0,Math.ceil((z-plane)/FLOW_DEPTH));z-=cycle*FLOW_DEPTH;
+            const depth=camera.eye[2]-z;
+            if(depth<99.96)continue;
+            if(recycleCycles[i]!==cycle) {
+              const xy=cycle>0?cycleCoordinates(i,cycle,stars[offset+2],densityVariation)
+                :naturalCoordinates(stars[offset],stars[offset+1],(RECYCLE_Z-stars[offset+2])/FLOW_DEPTH,densityVariation);
+              recycleXY[i*2]=xy[0];recycleXY[i*2+1]=xy[1];recycleCycles[i]=cycle;
+            }
+            let x=recycleXY[i*2],y=recycleXY[i*2+1];
+            x=(x*halfX*expansion-camera.eye[0])*focal/depth+projection.centerX;
+            y=(y*halfY*expansion-camera.eye[1])*focal/depth+state.height-projection.centerY;
+            buckets.add(i,depth,x,y,sourceViewports);
+          }
+        }
+        gl.clearColor(0,0,0,0);gl.viewport(0,0,targetWidth,targetHeight);
+        gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);gl.useProgram(starsProgram);gl.bindVertexArray(starVAO);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,buckets.pack());
+        gl.uniform3fv(starU.camera,camera.eye);gl.uniform3fv(starU.cameraRight,camera.right);gl.uniform3fv(starU.cameraUp,camera.up);gl.uniform3fv(starU.cameraForward,camera.forward);
+        gl.uniform2f(starU.resolution,state.width,state.height);gl.uniform2f(starU.projectionCenter,projection.centerX,state.height-projection.centerY);
+        gl.uniform1f(starU.arrival,arrival);gl.uniform1f(starU.elapsed,state.time);gl.uniform1f(starU.storageScale,1);
+        gl.uniform1f(starU.expansion,motion.progress);gl.uniform1f(starU.flowDistance,motion.flow);gl.uniform1f(starU.largeStarFraction,settingsValue.largeStars);
+        gl.uniform1f(starU.densityVariation,densityVariation);
+        gl.uniform1f(starU.recyclePlane,Math.max(RECYCLE_Z,camera.eye[2]+100));
+        gl.useProgram(lensProgram);
+        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D_ARRAY,starTexture);gl.uniform1i(lensU.starImage,0);
+        gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D_ARRAY,fieldTexture);gl.uniform1i(lensU.rayField,1);
+        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,introTexture);gl.uniform1i(lensU.introField,3);
+        gl.uniform1i(lensU.introEnabled,state.intro.progress<1?1:0);gl.uniform1f(lensU.introProgress,state.intro.progress);
+        gl.uniform1i(lensU.maskOpaque,state.intro.mass>=1?1:0);
+        gl.uniform2f(lensU.resolution,state.width,state.height);gl.uniform4f(lensU.searchBox,projection.centerX,state.height-projection.centerY,projection.halfWidth,projection.halfHeight);
+        gl.uniform1f(lensU.cornerRadius,projection.radius);
+        gl.uniform1f(lensU.mass,(settingsValue.gravity+(FOCUS_MASS-settingsValue.gravity)*state.activation)*fieldMassScale*state.intro.mass);
+        gl.uniform1f(lensU.localStrength,settingsValue.localBoost);gl.uniform1f(lensU.localWidth,settingsValue.localWidth);
+        gl.uniform1f(lensU.probeMode,probe.enabled?1:0);gl.uniform2f(lensU.probeSource,probe.x,probe.y);gl.uniform1f(lensU.probeDepth,probe.depth);
+        gl.uniform1fv(lensU['sourcePlanes[0]'],DEPTHS);gl.uniform1f(lensU.arrival,arrival);gl.uniform1f(lensU.storageScale,1);
+        // Original constant-speed propagation; retain the stronger deflection.
+        const waveAge=state.effectsTime-state.pulse;
+        gl.uniform1f(lensU.pulseAge,waveAge<WAVE_SECONDS?waveAge:100);
+        gl.uniform4fv(lensU['sourceViewports[0]'],sourceViewports);
+        gl.uniform1i(lensU.fieldLinear,fieldLinear?1:0);
+        gl.uniform1i(lensU.gridEnabled,grid.enabled?1:0);gl.uniform1i(lensU.gridLayer,grid.layer);
+        gl.uniform1f(lensU.elapsed,state.time);gl.uniform1i(lensU.rimEnabled,1);
+        gl.uniform1i(lensU.accumulatedLight,2);
+        // A sampler must not remain bound to its own render target, even in
+        // an untaken shader branch. Use a harmless texture while accumulating.
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,massTexture);
+        gl.bindFramebuffer(gl.FRAMEBUFFER,lightTarget);gl.clear(gl.COLOR_BUFFER_BIT);
+        const layers=[];
+        for(let i=0;i<DEPTHS.length;i++)if(probe.enabled?GravityPhysics.depthWeight(probe.depth,i)>0:buckets.counts[i]>0)layers.push(i);
+        for(let start=0;start<layers.length;start+=SOURCE_BATCH_SIZE){
+          batchActive.fill(0);
+          gl.useProgram(starsProgram);gl.bindVertexArray(starVAO);gl.bindFramebuffer(gl.FRAMEBUFFER,target);gl.viewport(0,0,targetWidth,targetHeight);
+          for(let slot=0;slot<SOURCE_BATCH_SIZE&&start+slot<layers.length;slot++){
+            const i=layers[start+slot];batchActive[i]=1;sourceSlots[i]=slot;
+            if(probe.enabled)continue;
+            gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,starTexture,0,slot);gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.uniform3f(starU.sourceDepths,DEPTHS[i-1]||0,DEPTHS[i],DEPTHS[i+1]||0);
+            gl.uniform4fv(starU.sourceViewport,sourceViewports.subarray(i*4,i*4+4));
+            gl.uniform1f(starU.pixelRatio,targetHeight/sourceViewports[i*4+3]);
+            gl.drawElements(gl.POINTS,buckets.counts[i],gl.UNSIGNED_INT,buckets.offsets[i]*4);
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER,lightTarget);gl.viewport(0,0,canvas.width,canvas.height);gl.useProgram(lensProgram);gl.bindVertexArray(screenVAO);
+          gl.uniform1fv(lensU['activeLayers[0]'],batchActive);gl.uniform1fv(lensU['sourceSlots[0]'],sourceSlots);gl.uniform1i(lensU.renderStage,1);
+          gl.drawArrays(gl.TRIANGLES,0,3);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);gl.disable(gl.BLEND);gl.useProgram(lensProgram);gl.bindVertexArray(screenVAO);
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,lightTexture);gl.uniform1i(lensU.renderStage,2);
+        gl.drawArrays(gl.TRIANGLES,0,3);
+        gl.activeTexture(gl.TEXTURE0);
+        profiler?.end({vertices:buckets.total,layers:layers.length,canvas:[canvas.width,canvas.height],source:[targetWidth,targetHeight],sourcePixelRatio:canvas.dataset.sourcePixelRatio});
+      };
+      scene.dataset.renderer='webgl2-physical-volume';
+    }
+    function initFallback() {
+      const replacement=canvas.cloneNode();canvas.replaceWith(replacement);canvas=replacement;
+      const ctx=canvas.getContext('2d');gl=null;resizeTarget=()=>{};
+      renderer=()=>{
+        const dpr=canvas.width/state.width;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#000';ctx.fillRect(0,0,state.width,state.height);
+        const motion=motionAt(state.time),camera=cameraPose(motion.progress),focal=state.height*FIELD_FOCAL*.5,expansion=motion.progress,flow=motion.flow;
+        const recyclePlane=Math.max(RECYCLE_Z,camera.eye[2]+100);
+        const volumeY=FLOW_DEPTH/FIELD_FOCAL*FIELD_PADDING,volumeX=volumeY*state.width/state.height;
+        const starTotal=starCount();
+        for(let ordinal=0;ordinal<starTotal+settingsValue.galaxies;ordinal++) {
+          if(ordinal<starTotal&&ordinal%9!==0)continue;
+          const index=ordinal<starTotal?ordinal:MAX_STARS+ordinal-starTotal;
+          const i=index*STAR_STRIDE;
+          const large=stars[i+10]>=0&&stars[i+10]<settingsValue.largeStars;
+          let worldZ=-4900+(stars[i+2]+4900)*expansion+flow;
+          const cycle=Math.max(0,Math.ceil((worldZ-recyclePlane)/FLOW_DEPTH));worldZ-=cycle*FLOW_DEPTH;
+          const xy=cycle>0?cycleCoordinates(index,cycle,stars[i+2],1-settingsValue.uniformity)
+            :naturalCoordinates(stars[i],stars[i+1],(RECYCLE_Z-stars[i+2])/FLOW_DEPTH,1-settingsValue.uniformity);
+          let worldX=xy[0]*volumeX*expansion,worldY=xy[1]*volumeY*expansion;
+          const delta=[worldX-camera.eye[0],worldY-camera.eye[1],worldZ-camera.eye[2]],z=dot(delta,camera.forward);
+          if(z<100)continue;
+          const projected=[state.lensShape.centerX+dot(delta,camera.right)*focal/z,state.height-state.lensShape.centerY+dot(delta,camera.up)*focal/z];
+          const [x,y]=projected;
+          const characterSize=large?stars[i+11]:stars[i+6];
+          const energy=large?stars[i+12]:stars[i+7];
+          const size=Math.max(.3,Math.min(3.8,characterSize*1400/z));
+          const seed=(stars[i+8]*7.13)%1,birthAlpha=seed<.025?1:smooth(.08+seed*.42,.48+seed*.52,expansion);
+          const alpha=birthAlpha*(.45+.55*smooth(.1,.9,expansion))*smooth(100,400,z)*smooth(recyclePlane-FLOW_DEPTH,recyclePlane-FLOW_DEPTH+1600,worldZ);
+          ctx.fillStyle=`rgba(190,215,255,${Math.min(.9,.1+energy*.3)*alpha})`;ctx.beginPath();ctx.arc(x,state.height-y,size,0,Math.PI*2);ctx.fill();
+        }
+      };
+      scene.dataset.renderer='canvas2d-3d-fallback';
+      status.textContent='Физическая линза требует WebGL 2 с плавающей точкой. Сейчас показано поле без искажения.';
+    }
+    let arrivalLayoutKey='';
+    function updateArrival(force=false) {
+      // Use the animation clock so reveal, replay and pause stay synchronized.
+      for(const animation of streakAnimations)animation.currentTime=state.time*1000;
+      canvas.style.opacity=String(smooth(0,STAR_REVEAL_DURATION,state.time));
+      state.intro=GravityIntro.timeline(state.time);
+      state.lensShape=GravityIntro.shape(state,state.width,state.height,state.intro.progress);
+      const phase=state.intro,shape=state.lensShape;
+      state.formReveal=phase.rim;
+      // The field keeps moving, but settled layout/ARIA values need no writes.
+      // Resize and replay still invalidate the shape through this key.
+      const layoutKey=[phase.mass,phase.progress,state.width,state.height,state.centerX,state.centerY,state.halfWidth,state.halfHeight,state.radius].join(',');
+      if(phase.photon>0){
+        photonRing.style.opacity=String(phase.photon*(.94+.06*Math.sin(state.time*2.8)));
+        photonRing.style.setProperty('--photon-angle',`${(state.time*45)%360}deg`);
+      }
+      if(!force&&layoutKey===arrivalLayoutKey)return;
+      arrivalLayoutKey=layoutKey;
+      // Keep layout at its final height. Width, corner radius, mass centres and
+      // projection origin all follow the same phase; glyphs are never scaled.
+      composition.style.opacity='1';
+      // Remove the opaque disc as well as its gravity during the star-only phase.
+      form.style.opacity=String(phase.mass);
+      form.style.width=shape.halfWidth*2+'px';
+      form.style.transform=`translate(${shape.centerX-state.centerX}px,${shape.centerY-state.centerY}px)`;
+      form.style.setProperty('--prompt-radius',shape.radius+'px');
+      form.style.setProperty('--frame-light',String(phase.rim));
+      // Rotate the light around the contour, never the contour itself. Both
+      // the shimmer and orbit use the same clock as stars, pause and replay.
+      if(phase.photon===0)photonRing.style.opacity='0';
+      form.style.backgroundColor=`rgb(${3*phase.progress},${4*phase.progress},${5*phase.progress})`;
+      heading.style.opacity=String(phase.copy);branding.style.opacity=String(phase.copy);footer.style.opacity=String(phase.copy);
+      input.style.opacity=String(phase.content);promptBottom.style.opacity=String(phase.content);
+      const arrived=phase.progress>=.999;
+      scene.dataset.arrived=String(arrived);scene.dataset.introProgress=phase.progress.toFixed(5);scene.dataset.introMass=phase.mass.toFixed(5);
+      form.inert=!arrived;footer.inert=phase.copy<.1;
+      heading.setAttribute('aria-hidden',String(phase.copy===0));branding.setAttribute('aria-hidden',String(phase.copy===0));
+    }
+    function resize() {
+      // Measure the finished input, independently of the animated width/offset.
+      form.style.width='100%';form.style.transform='none';form.style.removeProperty('--prompt-radius');
+      const rect=scene.getBoundingClientRect(),box=form.getBoundingClientRect();
+      state.width=rect.width;state.height=rect.height;
+      state.centerX=box.left-rect.left+box.width/2;state.centerY=box.top-rect.top+box.height/2;
+      state.halfWidth=box.width/2;state.halfHeight=box.height/2;state.radius=parseFloat(getComputedStyle(form).borderRadius);
+      const dpr=Math.min(devicePixelRatio||1,2);
+      const width=Math.round(state.width*dpr),height=Math.round(state.height*dpr);
+      if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+      updateMassModel();updateArrival(true);resizeTarget();renderer();
+    }
+    function tick(now) {
+      frame=0;
+      if(!state.visible||document.hidden||(state.paused&&!waveActive()&&!interactionActive())){previousTime=0;return;}
+      const elapsed=previousTime?Math.max(0,(now-previousTime)/1000):0;previousTime=now;
+      const dt=Math.min(elapsed,.05);
+      // UI reactions use real elapsed seconds, including slow render frames.
+      state.effectsTime+=elapsed;
+      if(!state.paused)state.time+=dt*settingsValue.speed;
+      const smoothing=state.paused?0:1-Math.exp(-dt*4);
+      state.pointerX+=(state.targetX-state.pointerX)*smoothing;
+      state.pointerY+=(state.targetY-state.pointerY)*smoothing;
+      const focused=document.activeElement===input?1:0,engaged=state.overForm||focused?1:0;
+      for(const [key,target] of [['engagement',engaged],['activation',focused]]){
+        const tween=interactionTweens[key];
+        if(tween.to!==target){tween.from=state[key];tween.to=target;tween.since=state.effectsTime;}
+        state[key]=reducedMotion.matches?target:GravityIntro.transition(tween.from,tween.to,state.effectsTime-tween.since,INTERACTION_SECONDS);
+      }
+      updateArrival();renderer();start();
+    }
+    function waveActive(){return state.effectsTime-state.pulse<WAVE_SECONDS;}
+    function interactionActive(){
+      const focused=document.activeElement===input?1:0,engaged=state.overForm||focused?1:0;
+      return state.activation!==focused||state.engagement!==engaged;
+    }
+    function start(){if(!frame&&(!state.paused||waveActive()||interactionActive())&&state.visible&&!document.hidden)frame=requestAnimationFrame(tick);}
+    function syncPause() {
+      pauseButton.setAttribute('aria-pressed',String(state.paused));pauseButton.setAttribute('aria-label',state.paused?'Продолжить движение':'Приостановить движение');
+      pauseButton.title=state.paused?'Продолжить движение':'Приостановить движение';
+      byId('pause-icon').innerHTML=state.paused?'<path d="m5 3 7 5-7 5V3Z" stroke="currentColor" stroke-width="1.3"/>':'<path d="M5 4v8M11 4v8" stroke="currentColor" stroke-width="1.6"/>';
+      if(state.paused){cancelAnimationFrame(frame);frame=0;previousTime=0;}start();
+    }
+    scene.addEventListener('pointermove',event=>{
+      if(event.pointerType==='touch')return;
+      const rect=scene.getBoundingClientRect();
+      state.targetX=Math.max(-1,Math.min(1,(event.clientX-rect.left)/rect.width*2-1));
+      state.targetY=Math.max(-1,Math.min(1,1-(event.clientY-rect.top)/rect.height*2));
+    },{passive:true});
+    const resetPointer=()=>{state.targetX=0;state.targetY=0;};
+    scene.addEventListener('pointerleave',resetPointer);window.addEventListener('blur',resetPointer);
+    form.addEventListener('pointerenter',()=>{state.overForm=!state.hoverSuppressed;start();});
+    form.addEventListener('pointerleave',()=>{state.overForm=false;state.hoverSuppressed=false;start();});
+    input.addEventListener('focus',()=>{state.hoverSuppressed=false;start();});input.addEventListener('blur',start);
+    function launchWave() {
+      state.pulse=state.effectsTime;
+      start();
+      return true;
+    }
+    input.addEventListener('input',()=>{input.style.removeProperty('height');input.style.height=Math.min(input.scrollHeight,150)+'px';resize();});
+    input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();form.requestSubmit();}});
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      const previousHeight=form.getBoundingClientRect().height;
+      input.value='';input.style.removeProperty('height');
+      // A pointer resting on the send button must not reactivate the field.
+      state.overForm=false;state.hoverSuppressed=true;
+      if(form.contains(document.activeElement))document.activeElement.blur();
+      if(Math.abs(form.getBoundingClientRect().height-previousHeight)>.01)resize();
+      launchWave();
+      status.textContent='Импульс запущен. Это визуальная демка, без AI-генерации.';
+      clearTimeout(statusTimer);statusTimer=setTimeout(()=>{status.textContent='';},5500);
+    });
+    byId('replay').addEventListener('click',()=>{
+      input.blur();
+      state.time=0;state.effectsTime=0;state.pulse=-100;state.engagement=0;state.activation=0;state.overForm=false;state.hoverSuppressed=false;
+      for(const tween of Object.values(interactionTweens)){tween.from=0;tween.to=0;tween.since=0;}
+      state.pointerX=0;state.pointerY=0;
+      state.paused=false;previousTime=0;
+      if(settingsValue.speed===0)settingsValue.speed=2;
+      status.textContent='';clearTimeout(statusTimer);updateArrival();renderer();syncPause();
+    });
+    pauseButton.addEventListener('click',()=>{state.paused=!state.paused;syncPause();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;previousTime=0;}else start();});
+    reducedMotion.addEventListener('change',event=>{state.paused=event.matches;if(event.matches)state.time=Math.max(state.time,REDUCED_MOTION_TIME);updateArrival();renderer();syncPause();});
+    new IntersectionObserver(([entry])=>{state.visible=entry.isIntersecting;if(state.visible)start();else{cancelAnimationFrame(frame);frame=0;previousTime=0;}},{threshold:0}).observe(scene);
+
+    try{initWebGL();resize();}catch(error){console.warn('3D fallback:',error.message);initFallback();resize();}
+
+    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelAnimationFrame(frame);frame=0;previousTime=0;});
+    canvas.addEventListener('webglcontextrestored',()=>{try{initWebGL();resize();start();}catch(error){initFallback();resize();start();}});
+    new ResizeObserver(resize).observe(scene);new ResizeObserver(resize).observe(composition);
+    window.addEventListener('resize',resize,{passive:true});
+    syncPause();start();
+  })();
+  </script>
+  <script src="mobile-viewport.js?v=1"></script>
+</body>
+</html>

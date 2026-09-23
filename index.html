@@ -45,6 +45,7 @@
     .prompt-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
     .prompt-mode { display: inline-flex; align-items: center; gap: 7px; color: #959eac; font-size: 12px; min-width: 0; }
     .prompt-mode-text { line-height: 1.25; }
+    .prompt-mode-text a { color: inherit; text-decoration: none; }
     .prompt-mode svg { width: 17px; height: 17px; color: #c6d7e9; flex: none; }
     .send { flex-shrink: 0; }
     .send { width: 36px; height: 36px; padding: 0; border: 0; background: #edf2f8; color: #0a0d12; border-radius: 50%; display: grid; place-items: center; transition: transform .2s, background .2s; }
@@ -56,6 +57,23 @@
     .quiet-button { width: 36px; height: 36px; padding: 0; border-radius: 8px; background: #0b0e12b8; border: 1px solid #ffffff14; color: #a9b0bc; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(12px); transition: background .2s, color .2s; }
     .quiet-button:hover, .quiet-button[aria-expanded="true"] { background: #161c25; color: #eef4ff; }
     .quiet-button svg { width: 13px; height: 13px; }
+    .settings { position: absolute; right: 0; bottom: 48px; width: 270px; max-height: calc(100svh - 125px); overflow-y: auto; padding: 20px; background: #101318f5; border: 1px solid #ffffff1c; box-shadow: 0 15px 60px #0008; backdrop-filter: blur(24px); border-radius: 16px; }
+    .settings-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 23px; }
+    .settings h2 { font-size: 13px; font-weight: 500; margin: 0; }
+    .reset { border: 0; color: #8f98a8; font-size: 10px; padding: 4px 0 4px 8px; background: none; }
+    .reset:hover { color: white; }
+    .setting { display: block; margin-top: 19px; }
+    .mass-profile { width:100%; padding:10px 11px; border:1px solid #ffffff25; border-radius:8px; background:#1a2029; color:#edf3fc; font:inherit; font-size:12px; }
+    .profile-note { margin:10px 0 0; color:#929dab; font-size:11px; line-height:1.5; }
+    .setting-head { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #a9b1bf; margin-bottom: 10px; }
+    output { font-variant-numeric: tabular-nums; color: #e2e9f3; }
+    input[type="range"] { width: 100%; display: block; margin: 0; height: 15px; accent-color: #c4d7ef; cursor: pointer; }
+    .probe-toggle { display: flex; align-items: center; gap: 9px; margin-top: 22px; padding-top: 17px; border-top: 1px solid #ffffff14; font-size: 12px; color: #c4ccd9; cursor: pointer; }
+    .probe-toggle input { accent-color: #c4d7ef; }
+    .probe-presets { display: flex; gap: 5px; margin-top: 14px; }
+    .probe-presets button { flex: 1; border: 1px solid #ffffff20; border-radius: 6px; padding: 7px 3px; background: #ffffff08; color: #d3deee; font-size: 11px; }
+    .probe-presets button:hover { background: #ffffff18; }
+    .probe-note { margin: 13px 0 0; color: #8893a3; font-size: 11px; line-height: 1.5; }
     .scene[data-rim="false"] .prompt-streaks, .scene[data-rim="false"] .photon-ring, .scene[data-rim="false"] .prompt::before, .scene[data-probe="true"] .prompt-streaks, .scene[data-probe="true"] .photon-ring, .scene[data-probe="true"] .prompt::before { display: none; }
     .scene[data-rim="false"] .prompt { box-shadow: none; }
     .scene[data-probe="true"] .prompt { border-color: #ffffff15; box-shadow: none; }
@@ -78,6 +96,7 @@
       .footer { position: relative; inset: auto; flex: none; margin: 0 calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left)); padding-bottom: calc(22px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
       .footer-controls { margin-left: auto; }
       .quiet-button { width: 40px; height: 40px; }
+      .scene .settings { bottom: calc(112px + env(safe-area-inset-bottom)); max-height: calc(100svh - 150px); max-height: calc(var(--visible-height, 100dvh) - 150px); width: min(270px, calc(100vw - 40px)); }
       .send { width: 40px; height: 40px; }
     }
     @media (max-width: 420px) { .footer { flex-wrap: wrap; } .footer-controls { margin-left: auto; } }
@@ -103,7 +122,7 @@
         <label class="sr-only" for="prompt">Ваша идея</label>
         <textarea id="prompt" rows="1" maxlength="500" autocomplete="off" spellcheck="false" placeholder="Как выглядит ваша следующая идея?"></textarea>
         <div class="prompt-bottom">
-          <span class="prompt-mode"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8L12 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="prompt-mode-text">Вдохновлено kreaAI</span></span>
+          <span class="prompt-mode"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8L12 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="prompt-mode-text">Вдохновлено <a href="https://www.krea.ai/" target="_blank" rel="noopener noreferrer">Krea.Ai</a></span></span>
           <button class="send" type="submit" aria-label="Запустить импульс"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </form>
@@ -113,7 +132,51 @@
       <div class="footer-controls">
         <button class="quiet-button" id="replay" type="button" aria-label="Повторить пролёт" title="Повторить пролёт"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6a5 5 0 1 1 0 5M3 2v4h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="quiet-button" id="pause" type="button" aria-label="Приостановить движение" aria-pressed="false"><svg id="pause-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5 4v8M11 4v8" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        <button class="quiet-button" id="settings-toggle" type="button" aria-label="Настроить" title="Настроить" aria-expanded="false" aria-controls="settings"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 2v12M8 2v12M13 2v12M1 6h4M6 10h4M11 5h4" stroke="currentColor" stroke-width="1.2"/></svg></button>
       </div>
+      <section class="settings" id="settings" aria-label="Настройки пространства" hidden>
+        <div class="settings-heading"><h2>Параметры пространства</h2><button class="reset" id="reset" type="button">Сбросить</button></div>
+        <label class="setting" for="mass-profile"><span class="setting-head">Распределение массы</span>
+          <select class="mass-profile" id="mass-profile" aria-describedby="mass-profile-note">
+            <option value="shell">Узкая оболочка</option>
+            <option value="wide">Широкая оболочка</option>
+            <option value="compact">Масса внутри формы</option>
+            <option value="original" selected>Исходный объём</option>
+          </select>
+        </label>
+        <p class="profile-note" id="mass-profile-note"></p>
+        <label class="setting" for="gravity"><span class="setting-head">Масса линзы<output id="gravity-value" for="gravity">26%</output></span><input id="gravity" type="range" min="0" max="400" value="26" step="1"></label>
+        <label class="setting" for="localBoost"><span class="setting-head">Локальное усиление<output id="localBoost-value" for="localBoost">3000%</output></span><input id="localBoost" type="range" min="0" max="3000" value="3000" step="1" aria-describedby="local-boost-note"></label>
+        <label class="setting" for="localWidth"><span class="setting-head">Ширина зоны<output id="localWidth-value" for="localWidth">25 px</output></span><input id="localWidth" type="range" min="1" max="150" value="25" step="1" data-scale="1" data-unit="px" aria-describedby="local-boost-note"></label>
+        <p class="profile-note" id="local-boost-note">Сильнее у рамки, быстро ослабевает и плавно сходит на нет у границы зоны. Отдельный визуальный эффект.</p>
+        <label class="setting" for="density"><span class="setting-head">Звёзды<output id="density-value" for="density">25%</output></span><input id="density" type="range" min="25" max="160" value="25" step="1"></label>
+        <label class="setting" for="largeStars"><span class="setting-head">Крупные звёзды<output id="largeStars-value" for="largeStars">0.5%</output></span><input id="largeStars" type="range" min="0" max="12" value="0.5" step="0.5"></label>
+        <label class="setting" for="galaxies"><span class="setting-head">Галактики<output id="galaxies-value" for="galaxies">74</output></span><input id="galaxies" type="range" min="0" max="400" value="74" step="1" data-scale="1" data-unit="count"></label>
+        <label class="setting" for="uniformity"><span class="setting-head">Однородность<output id="uniformity-value" for="uniformity">100%</output></span><input id="uniformity" type="range" min="0" max="100" value="100" step="1" aria-describedby="uniformity-note"></label>
+        <p class="profile-note" id="uniformity-note">Для звёзд и галактик. 100% — равномерное поле, 0% — плотные и разреженные области.</p>
+        <label class="setting" for="speed"><span class="setting-head">Скорость<output id="speed-value" for="speed">2.0×</output></span><input id="speed" type="range" min="0" max="200" value="200" step="5"></label>
+        <label class="probe-toggle"><input id="lens-grid" type="checkbox">Сетка искажения</label>
+        <div id="grid-controls" hidden>
+          <label class="setting" for="grid-depth"><span class="setting-head">Глубина сетки</span>
+            <select class="mass-profile" id="grid-depth">
+              <option value="154">Перед линзой — 154</option>
+              <option value="220">В центре линзы — 220</option>
+              <option value="2640" selected>За линзой — 2 640</option>
+              <option value="12100">Далеко — 12 100</option>
+              <option value="24200">Самая дальняя — 24 200</option>
+            </select>
+          </label>
+        </div>
+        <label class="probe-toggle"><input id="rim-effects" type="checkbox" checked>Анимация рамки</label>
+        <label class="probe-toggle"><input id="lens-probe" type="checkbox">Проверка одной звездой</label>
+        <div id="probe-controls" hidden>
+          <div class="probe-presets"><button type="button" data-probe-x="-420">Слева</button><button type="button" data-probe-x="0">По центру</button><button type="button" data-probe-x="420">Справа</button></div>
+          <label class="setting" for="probe-x"><span class="setting-head">Смещение по горизонтали<output id="probe-x-value" for="probe-x">-69 px</output></span><input id="probe-x" type="range" min="-500" max="500" value="-69" step="1"></label>
+          <label class="setting" for="probe-y"><span class="setting-head">Смещение по вертикали<output id="probe-y-value" for="probe-y">0 px</output></span><input id="probe-y" type="range" min="-500" max="500" value="0" step="1"></label>
+          <label class="setting" for="probe-depth"><span class="setting-head">Расстояние<output id="probe-depth-value" for="probe-depth">2600</output></span><input id="probe-depth" type="range" min="100" max="12000" value="2600" step="50"></label>
+          <p class="probe-note">Один источник за объёмной массой. Изображение зависит от его положения и расстояния; кольцо не задаётся.</p>
+        </div>
+      </section>
     </footer>
   </main>
   <script src="mass-profiles.js"></script>
@@ -133,7 +196,7 @@
     const composition = document.querySelector('.composition');
     const heading=document.querySelector('.intro'),branding=document.querySelector('.topbar'),footer=document.querySelector('.footer'),promptBottom=document.querySelector('.prompt-bottom');
     const status = byId('status'), pauseButton = byId('pause');
-
+    const settings = byId('settings'), settingsToggle = byId('settings-toggle');
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     const renderQuality=new GravityRenderPolicy.QualityPolicy(GravityRenderPolicy.isMobileDevice(navigator),devicePixelRatio||1);
     const framePacer=new GravityRenderPolicy.FramePacer();
@@ -152,15 +215,26 @@
     const probe = { enabled: false, x: -69, y: 0, depth: 2600 };
     const STAR_STRIDE = 13;
     const settingsDefault = { gravity: .26, localBoost: 30, localWidth: 25, density: .25, largeStars: .005, galaxies: 74, uniformity: 1, speed: 2 };
-    const profileDefault = 'original';
+    const profileDefault = 'original', gridDepthDefault = '2640';
     const restored = { settings: settingsDefault };
     // Opt-in still frames for visual QA; ordinary visits use the existing clock.
     const previewQuery=new URLSearchParams(location.search).get('intro');
     const previewTime=previewQuery!==null&&Number.isFinite(Number(previewQuery))?Math.max(0,Number(previewQuery)):null;
     const settingsValue = { ...restored.settings };
-    const grid={enabled:false,layer:DEPTHS.indexOf(2640)};
-    const massProfile=profileDefault;
-    scene.dataset.rim='true';
+    const grid={enabled:byId('lens-grid').checked,layer:DEPTHS.indexOf(Number(byId('grid-depth').value))};
+    byId('grid-controls').hidden=!grid.enabled;
+    scene.dataset.rim=String(byId('rim-effects').checked);
+    let massProfile=restored.profile||profileDefault;
+    byId('mass-profile').value=massProfile;
+    function updateProfileNote() {
+      byId('mass-profile-note').textContent={
+        shell:'Увеличение рядом с рамкой. Подобранная плотность; часть массы находится снаружи инпута.',
+        wide:'Более широкая область увеличения. Объём массы сильнее выступает за рамку.',
+        compact:'Центры масс остаются внутри формы. Эффект мягче, особенно вдоль длинных сторон.',
+        original:'Прежняя равномерная плотность. При большой массе возможны боковые пики и овальная область.'
+      }[massProfile];
+    }
+    updateProfileNote();
     const state = {
       width: 1, height: 1, centerX: 0, centerY: 0, halfWidth: 1, halfHeight: 1, radius: 32,
       time: previewTime ?? restored.time ?? (reducedMotion.matches ? REDUCED_MOTION_TIME : 0),
@@ -627,7 +701,7 @@
         // 360px displacement. Reserving it around the entire screen wastes
         // source texels and makes every star look magnified from a tiny bitmap.
         const cellSpan=Math.hypot(W/fieldWidth,H/fieldHeight),localSupport=new Uint8Array(fieldWidth*fieldHeight);
-        const reach=150+WAVE_SHIFT+cellSpan;
+        const reach=Number(byId('localWidth').max)+WAVE_SHIFT+cellSpan;
         for(let y=0;y<fieldHeight;y++)for(let x=0;x<fieldWidth;x++){
           const qx=Math.abs((x+.5)/fieldWidth*W-state.centerX)-state.halfWidth+state.radius;
           const qy=Math.abs((y+.5)/fieldHeight*H-(H-state.centerY))-state.halfHeight+state.radius;
@@ -711,7 +785,7 @@
         const drift=Math.hypot(state.centerX-state.width*.5,state.centerY-state.height*.5);
         gl.uniform1i(u.fields,3);gl.uniform1i(u.tileSize,16);gl.uniform1f(u.mass,settingsValue.gravity*fieldMassScale);
         gl.uniform2f(u.resolution,state.width,state.height);gl.uniform4fv(u['boxes[0]'],boxes);gl.uniform1fv(u['radii[0]'],radii);
-        gl.uniform1f(u.reach,150+WAVE_SHIFT+Math.hypot(state.width/w,state.height/h)+(state.halfWidth-state.halfHeight+drift)/count);
+        gl.uniform1f(u.reach,Number(byId('localWidth').max)+WAVE_SHIFT+Math.hypot(state.width/w,state.height/h)+(state.halfWidth-state.halfHeight+drift)/count);
         gl.viewport(0,0,cols,totalRows);gl.drawArrays(gl.TRIANGLES,0,3);
         const tiles=new Float32Array(cols*totalRows*4);gl.readPixels(0,0,cols,totalRows,gl.RGBA,gl.FLOAT,tiles);
         if(gl.getError()!==gl.NO_ERROR)throw new Error('Intro field bounds unavailable');
@@ -882,7 +956,7 @@
         gl.uniform4fv(lensU['sourceViewports[0]'],sourceViewports);
         gl.uniform1i(lensU.fieldLinear,fieldLinear?1:0);
         gl.uniform1i(lensU.gridEnabled,grid.enabled?1:0);gl.uniform1i(lensU.gridLayer,grid.layer);
-        gl.uniform1f(lensU.elapsed,state.time);gl.uniform1i(lensU.rimEnabled,1);
+        gl.uniform1f(lensU.elapsed,state.time);gl.uniform1i(lensU.rimEnabled,byId('rim-effects').checked?1:0);
         gl.uniform1i(lensU.accumulatedLight,2);
         // A sampler must not remain bound to its own render target, even in
         // an untaken shader branch. Use a harmless texture while accumulating.
@@ -913,6 +987,8 @@
         profiler?.end({vertices:buckets.total,layers:layers.length,canvas:[canvas.width,canvas.height],source:[targetWidth,targetHeight],sourcePixelRatio:canvas.dataset.sourcePixelRatio});
       };
       scene.dataset.renderer='webgl2-physical-volume';
+      byId('lens-grid').disabled=false;byId('grid-depth').disabled=false;
+      byId('lens-probe').disabled=false;byId('lens-probe').removeAttribute('title');byId('gravity').disabled=false;byId('localBoost').disabled=false;byId('localWidth').disabled=false;
     }
     function initFallback() {
       const replacement=canvas.cloneNode();canvas.replaceWith(replacement);canvas=replacement;
@@ -946,6 +1022,11 @@
         }
       };
       scene.dataset.renderer='canvas2d-3d-fallback';
+      probe.enabled=false;byId('lens-probe').checked=false;
+      byId('probe-controls').hidden=true;scene.dataset.probe='false';
+      byId('lens-probe').disabled=true;byId('gravity').disabled=true;byId('localBoost').disabled=true;byId('localWidth').disabled=true;
+      grid.enabled=false;byId('lens-grid').checked=false;byId('lens-grid').disabled=true;byId('grid-depth').disabled=true;byId('grid-controls').hidden=true;
+      byId('lens-probe').title='Проверка источника доступна в WebGL 2';
       status.textContent='Физическая линза требует WebGL 2 с плавающей точкой. Сейчас показано поле без искажения.';
     }
     let arrivalLayoutKey='';
@@ -1080,10 +1161,45 @@
       for(const tween of Object.values(interactionTweens)){tween.from=0;tween.to=0;tween.since=0;}
       state.pointerX=0;state.pointerY=0;
       state.paused=false;previousTime=0;framePacer.reset();renderQuality.resetSamples();
-      if(settingsValue.speed===0)settingsValue.speed=2;
+      if(settingsValue.speed===0){byId('speed').value='100';syncSetting('speed');}
       status.textContent='';clearTimeout(statusTimer);updateArrival();renderer();syncPause();
     });
     pauseButton.addEventListener('click',()=>{state.paused=!state.paused;syncPause();});
+    function setSettings(open){settings.hidden=!open;settingsToggle.setAttribute('aria-expanded',String(open));}
+    settingsToggle.addEventListener('click',()=>setSettings(settings.hidden));
+    document.addEventListener('pointerdown',event=>{if(!settings.hidden&&!settings.contains(event.target)&&!settingsToggle.contains(event.target))setSettings(false);});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!settings.hidden){setSettings(false);settingsToggle.focus();}});
+    function syncSetting(name) {
+      const field=byId(name),scale=Number(field.dataset.scale)||100;
+      settingsValue[name]=Number(field.value)/scale;
+      byId(name+'-value').value=name==='speed'?settingsValue[name].toFixed(1)+'×':field.value+(field.dataset.unit==='px'?' px':field.dataset.unit==='count'?'':'%');renderer();
+    }
+    for(const name of Object.keys(settingsValue))byId(name).addEventListener('input',()=>syncSetting(name));
+    function syncGrid(){grid.enabled=byId('lens-grid').checked;grid.layer=DEPTHS.indexOf(Number(byId('grid-depth').value));byId('grid-controls').hidden=!grid.enabled;renderer();}
+    byId('lens-grid').addEventListener('change',syncGrid);byId('grid-depth').addEventListener('change',syncGrid);
+    byId('rim-effects').addEventListener('change',()=>{scene.dataset.rim=String(byId('rim-effects').checked);});
+    byId('mass-profile').addEventListener('change',()=>{massProfile=byId('mass-profile').value;updateProfileNote();resize();});
+    byId('reset').addEventListener('click',()=>{
+      massProfile=profileDefault;byId('mass-profile').value=massProfile;updateProfileNote();
+      byId('lens-grid').checked=false;byId('grid-depth').value=gridDepthDefault;syncGrid();
+      byId('rim-effects').checked=true;scene.dataset.rim='true';
+      byId('lens-probe').checked=false;
+      for(const id of ['probe-x','probe-y','probe-depth'])byId(id).value=byId(id).defaultValue;
+      syncProbe();
+      for(const name of Object.keys(settingsValue)){const field=byId(name);field.value=String(settingsDefault[name]*(Number(field.dataset.scale)||100));syncSetting(name);}
+      resize();
+    });
+    function syncProbe() {
+      probe.enabled=byId('lens-probe').checked;
+      probe.x=Number(byId('probe-x').value);probe.y=Number(byId('probe-y').value);probe.depth=Number(byId('probe-depth').value);
+      byId('probe-x-value').value=probe.x+' px';byId('probe-y-value').value=probe.y+' px';byId('probe-depth-value').value=probe.depth;
+      byId('probe-controls').hidden=!probe.enabled;scene.dataset.probe=String(probe.enabled);
+      state.pulse=-100;renderer();
+    }
+    for(const id of ['lens-probe','probe-x','probe-y','probe-depth'])byId(id).addEventListener('input',syncProbe);
+    for(const button of document.querySelectorAll('[data-probe-x]'))button.addEventListener('click',()=>{
+      byId('probe-x').value=button.dataset.probeX;byId('probe-y').value='0';syncProbe();
+    });
     document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}else start();});
     reducedMotion.addEventListener('change',event=>{state.paused=event.matches;if(event.matches)state.time=Math.max(state.time,REDUCED_MOTION_TIME);updateArrival();renderer();syncPause();});
     new IntersectionObserver(([entry])=>{state.visible=entry.isIntersecting;if(state.visible)start();else{cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}},{threshold:0}).observe(scene);

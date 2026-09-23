@@ -142,21 +142,21 @@
       </div>
       <section class="settings" id="settings" aria-label="Настройки пространства" hidden>
         <div class="settings-heading"><h2>Параметры пространства</h2><button class="reset" id="reset" type="button">Сбросить</button></div>
-        <label class="setting" for="gravity"><span class="setting-head">Масса линзы<output id="gravity-value" for="gravity">26%</output></span><input id="gravity" type="range" min="0" max="400" value="26" step="1"></label>
+        <label class="setting" for="gravity"><span class="setting-head">Масса линзы<output id="gravity-value" for="gravity">48%</output></span><input id="gravity" type="range" min="0" max="400" value="48" step="1"></label>
         <label class="setting" for="localBoost"><span class="setting-head">Локальное усиление<output id="localBoost-value" for="localBoost">3000%</output></span><input id="localBoost" type="range" min="0" max="3000" value="3000" step="1" aria-describedby="local-boost-note"></label>
         <label class="setting" for="localWidth"><span class="setting-head">Ширина зоны<output id="localWidth-value" for="localWidth">25 px</output></span><input id="localWidth" type="range" min="1" max="150" value="25" step="1" data-scale="1" data-unit="px" aria-describedby="local-boost-note"></label>
         <p class="profile-note" id="local-boost-note">Сильнее у рамки, быстро ослабевает и плавно сходит на нет у границы зоны. Отдельный визуальный эффект.</p>
-        <label class="setting" for="density"><span class="setting-head">Звёзды<output id="density-value" for="density">25%</output></span><input id="density" type="range" min="25" max="160" value="25" step="1"></label>
-        <label class="setting" for="largeStars"><span class="setting-head">Крупные звёзды<output id="largeStars-value" for="largeStars">0.5%</output></span><input id="largeStars" type="range" min="0" max="12" value="0.5" step="0.5"></label>
-        <label class="setting" for="galaxies"><span class="setting-head">Галактики<output id="galaxies-value" for="galaxies">74</output></span><input id="galaxies" type="range" min="0" max="400" value="74" step="1" data-scale="1" data-unit="count"></label>
-        <label class="setting" for="uniformity"><span class="setting-head">Однородность<output id="uniformity-value" for="uniformity">100%</output></span><input id="uniformity" type="range" min="0" max="100" value="100" step="1" aria-describedby="uniformity-note"></label>
+        <label class="setting" for="density"><span class="setting-head">Звёзды<output id="density-value" for="density">31%</output></span><input id="density" type="range" min="25" max="160" value="31" step="1"></label>
+        <label class="setting" for="largeStars"><span class="setting-head">Крупные звёзды<output id="largeStars-value" for="largeStars">6%</output></span><input id="largeStars" type="range" min="0" max="12" value="6" step="0.5"></label>
+        <label class="setting" for="galaxies"><span class="setting-head">Галактики<output id="galaxies-value" for="galaxies">176</output></span><input id="galaxies" type="range" min="0" max="400" value="176" step="1" data-scale="1" data-unit="count"></label>
+        <label class="setting" for="uniformity"><span class="setting-head">Однородность<output id="uniformity-value" for="uniformity">0%</output></span><input id="uniformity" type="range" min="0" max="100" value="0" step="1" aria-describedby="uniformity-note"></label>
         <p class="profile-note" id="uniformity-note">Для звёзд и галактик. 100% — равномерное поле, 0% — плотные и разреженные области.</p>
         <label class="setting" for="speed"><span class="setting-head">Скорость<output id="speed-value" for="speed">2.0×</output></span><input id="speed" type="range" min="0" max="200" value="200" step="5"></label>
         <fieldset class="flow-direction" aria-describedby="flow-direction-note">
           <legend>Направление движения</legend>
           <div class="flow-axes">
-            <label class="flow-axis" for="flow-x">X<input id="flow-x" type="number" min="-1" max="1" step="0.1" value="0" aria-label="Направление X"></label>
-            <label class="flow-axis" for="flow-y">Y<input id="flow-y" type="number" min="-1" max="1" step="0.1" value="0" aria-label="Направление Y"></label>
+            <label class="flow-axis" for="flow-x">X<input id="flow-x" type="number" min="-1" max="1" step="0.1" value="0.5" aria-label="Направление X"></label>
+            <label class="flow-axis" for="flow-y">Y<input id="flow-y" type="number" min="-1" max="1" step="0.1" value="0.5" aria-label="Направление Y"></label>
             <label class="flow-axis" for="flow-z">Z<input id="flow-z" type="number" min="-1" max="1" step="0.1" value="1" aria-label="Направление Z"></label>
           </div>
           <p class="profile-note" id="flow-direction-note">X — вправо, Y — вверх, Z — к камере. От −1 до 1; минус меняет направление. Оси складываются, скорость задаётся выше.</p>
@@ -221,9 +221,10 @@
     let massModel, massModelKey = "", fieldMassScale=1;
     const probe = { enabled: false, x: -69, y: 0, depth: 2600 };
     const STAR_STRIDE = 13;
-    const settingsDefault = { gravity: .26, localBoost: 30, localWidth: 25, density: .25, largeStars: .005, galaxies: 74, uniformity: 1, speed: 2 };
+    const settingsDefault = { gravity: .48, localBoost: 30, localWidth: 25, density: .31, largeStars: .06, galaxies: 176, uniformity: 0, speed: 2 };
     const massProfile = 'original', gridDepthDefault = '2640';
-    const flowDirection=[0,0,1],fieldTranslation=new GravityStarFlow.Translation();
+    const flowDirectionDefault=[.5,.5,1];
+    const flowDirection=[...flowDirectionDefault],fieldTranslation=new GravityStarFlow.Translation();
     const restored = { settings: settingsDefault };
     // Opt-in still frames for visual QA; ordinary visits use the existing clock.
     const previewQuery=new URLSearchParams(location.search).get('intro');
@@ -1204,7 +1205,7 @@
     }
     byId('reset').addEventListener('click',()=>{
       fieldTranslation.advance(motionAt(state.time).flow,flowDirection);
-      flowDirection.splice(0,3,0,0,1);
+      flowDirection.splice(0,3,...flowDirectionDefault);
       for(const [axis,id] of ['flow-x','flow-y','flow-z'].entries())byId(id).value=String(flowDirection[axis]);
       byId('lens-grid').checked=false;byId('grid-depth').value=gridDepthDefault;syncGrid();
       byId('rim-effects').checked=true;scene.dataset.rim='true';

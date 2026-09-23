@@ -121,6 +121,7 @@
   <script src="lens-intro.js?v=11"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
+  <script src="render-policy.js?v=1"></script>
 
   <script>
   (() => {
@@ -134,6 +135,8 @@
     const status = byId('status'), pauseButton = byId('pause');
 
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const renderQuality=new GravityRenderPolicy.QualityPolicy(GravityRenderPolicy.isMobileDevice(navigator),devicePixelRatio||1);
+    const framePacer=new GravityRenderPolicy.FramePacer();
     let canvas = byId('universe');
     const MOTION_DAMPING = GravityIntro.STAR_DAMPING, STAR_REVEAL_DURATION = .28;
     const REDUCED_MOTION_TIME = Math.max(MOTION_DAMPING*10,GravityIntro.END);
@@ -678,6 +681,18 @@
       // A complete placeholder keeps the optional sampler valid after a direct
       // visit to an already-finished scene or in reduced-motion mode.
       setupArray(introTexture,1,1,true,1);
+      canvas.dataset.introMapBytes='8';
+      const releaseIntroFields=()=>{
+        if(!introKey)return;
+        // Keep only a complete 1x1 placeholder for the inactive sampler. Replay
+        // regenerates the maps lazily, before its animation clock starts.
+        gl.activeTexture(gl.TEXTURE3);setupArray(introTexture,1,1,true,1);
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,boundsTexture);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,1,1,0,gl.RGBA,gl.FLOAT,null);
+        gl.activeTexture(gl.TEXTURE0);
+        introKey='';introMassKey='';introBounds=null;introWidth=1;introHeight=1;
+        canvas.dataset.introMapBytes='8';canvas.dataset.introMapSize='1x1';
+      };
       const reduceIntroBounds=()=>{
         const w=introWidth,h=introHeight,count=GravityIntro.KEYFRAMES,depth=DEPTHS.length;
         const cols=Math.ceil(w/16),rows=Math.ceil(h/16),totalRows=rows*count*depth*2;
@@ -743,6 +758,7 @@
         introKey=fieldKey;sourceBoundsKey='';
         canvas.dataset.introPreparationMs=(performance.now()-started).toFixed(1);
         canvas.dataset.introMapSize=w+'x'+h;
+        canvas.dataset.introMapBytes=String(w*h*count*depth*8);
         gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
       };
       const resizeSources=()=>{
@@ -772,9 +788,11 @@
         }
         const nextFieldKey=[massModelKey,state.width,state.height,state.centerX,state.centerY].join(',');
         if(fieldKey!==nextFieldKey) {
-          fieldWidth=384;fieldHeight=Math.max(128,Math.round(fieldWidth*state.height/state.width));
+          const fieldSize=GravityRenderPolicy.fieldSize(state.width,state.height);
+          fieldWidth=fieldSize.width;fieldHeight=fieldSize.height;
           setupArray(fieldTexture,fieldWidth,fieldHeight,true);
           canvas.dataset.fieldMapBytes=String(fieldWidth*fieldHeight*DEPTHS.length*8);
+          canvas.dataset.fieldMapSize=fieldWidth+'x'+fieldHeight;
           gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,massTexture);
           gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
           gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,massModel.count,1,0,gl.RGBA,gl.FLOAT,massModel.samples);
@@ -806,7 +824,7 @@
       };
       renderer=()=>{
         if(gl.isContextLost())return;
-        if(state.intro.progress<1)prepareIntroFields();
+        if(state.intro.progress<1)prepareIntroFields();else releaseIntroFields();
         profiler?.begin();
         updateSourceBounds();
         resizeSources();
@@ -968,6 +986,13 @@
       form.inert=!arrived;footer.inert=phase.copy<.1;
       heading.setAttribute('aria-hidden',String(phase.copy===0));branding.setAttribute('aria-hidden',String(phase.copy===0));
     }
+    function resizeCanvas(){
+      renderQuality.nativeDpr=devicePixelRatio||1;
+      const dpr=renderQuality.dpr,width=Math.round(state.width*dpr),height=Math.round(state.height*dpr);
+      if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+      canvas.dataset.renderDpr=String(dpr);canvas.dataset.targetFps=String(renderQuality.fps);
+      canvas.dataset.mobile=String(renderQuality.mobile);
+    }
     function resize() {
       // Measure the finished input, independently of the animated width/offset.
       form.style.width='100%';form.style.transform='none';form.style.removeProperty('--prompt-radius');
@@ -975,16 +1000,20 @@
       state.width=rect.width;state.height=rect.height;
       state.centerX=box.left-rect.left+box.width/2;state.centerY=box.top-rect.top+box.height/2;
       state.halfWidth=box.width/2;state.halfHeight=box.height/2;state.radius=parseFloat(getComputedStyle(form).borderRadius);
-      const dpr=Math.min(devicePixelRatio||1,2);
-      const width=Math.round(state.width*dpr),height=Math.round(state.height*dpr);
-      if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+      resizeCanvas();
       updateMassModel();updateArrival(true);resizeTarget();renderer();
     }
     function tick(now) {
       frame=0;
-      if(!state.visible||document.hidden||(state.paused&&!waveActive()&&!interactionActive())){previousTime=0;return;}
+      if(!state.visible||document.hidden||(state.paused&&!waveActive()&&!interactionActive())){previousTime=0;framePacer.reset();renderQuality.resetSamples();return;}
+      if(!framePacer.due(now,renderQuality.fps)){start();return;}
       const elapsed=previousTime?Math.max(0,(now-previousTime)/1000):0;previousTime=now;
-      const dt=Math.min(elapsed,.05);
+      // Absolute-time star trajectories and UI transitions retain their speed
+      // at both 30 and 60 FPS. Hidden/paused intervals reset previousTime.
+      const dt=elapsed;
+      if(renderQuality.observe(elapsed,!state.paused&&state.intro.progress===1&&!interactionActive()&&!waveActive())){
+        resizeCanvas();resizeTarget();
+      }
       // UI reactions use real elapsed seconds, including slow render frames.
       state.effectsTime+=elapsed;
       if(!state.paused)state.time+=dt*settingsValue.speed;
@@ -1004,12 +1033,16 @@
       const focused=document.activeElement===input?1:0,engaged=state.overForm||focused?1:0;
       return state.activation!==focused||state.engagement!==engaged;
     }
-    function start(){if(!frame&&(!state.paused||waveActive()||interactionActive())&&state.visible&&!document.hidden)frame=requestAnimationFrame(tick);}
+    function start(){
+      if(frame)return;
+      if((!state.paused||waveActive()||interactionActive())&&state.visible&&!document.hidden)frame=requestAnimationFrame(tick);
+      else {previousTime=0;framePacer.reset();renderQuality.resetSamples();}
+    }
     function syncPause() {
       pauseButton.setAttribute('aria-pressed',String(state.paused));pauseButton.setAttribute('aria-label',state.paused?'Продолжить движение':'Приостановить движение');
       pauseButton.title=state.paused?'Продолжить движение':'Приостановить движение';
       byId('pause-icon').innerHTML=state.paused?'<path d="m5 3 7 5-7 5V3Z" stroke="currentColor" stroke-width="1.3"/>':'<path d="M5 4v8M11 4v8" stroke="currentColor" stroke-width="1.6"/>';
-      if(state.paused){cancelAnimationFrame(frame);frame=0;previousTime=0;}start();
+      if(state.paused){cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}start();
     }
     scene.addEventListener('pointermove',event=>{
       if(event.pointerType==='touch')return;
@@ -1046,18 +1079,18 @@
       state.time=0;state.effectsTime=0;state.pulse=-100;state.engagement=0;state.activation=0;state.overForm=false;state.hoverSuppressed=false;
       for(const tween of Object.values(interactionTweens)){tween.from=0;tween.to=0;tween.since=0;}
       state.pointerX=0;state.pointerY=0;
-      state.paused=false;previousTime=0;
+      state.paused=false;previousTime=0;framePacer.reset();renderQuality.resetSamples();
       if(settingsValue.speed===0)settingsValue.speed=2;
       status.textContent='';clearTimeout(statusTimer);updateArrival();renderer();syncPause();
     });
     pauseButton.addEventListener('click',()=>{state.paused=!state.paused;syncPause();});
-    document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;previousTime=0;}else start();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}else start();});
     reducedMotion.addEventListener('change',event=>{state.paused=event.matches;if(event.matches)state.time=Math.max(state.time,REDUCED_MOTION_TIME);updateArrival();renderer();syncPause();});
-    new IntersectionObserver(([entry])=>{state.visible=entry.isIntersecting;if(state.visible)start();else{cancelAnimationFrame(frame);frame=0;previousTime=0;}},{threshold:0}).observe(scene);
+    new IntersectionObserver(([entry])=>{state.visible=entry.isIntersecting;if(state.visible)start();else{cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}},{threshold:0}).observe(scene);
 
     try{initWebGL();resize();}catch(error){console.warn('3D fallback:',error.message);initFallback();resize();}
 
-    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelAnimationFrame(frame);frame=0;previousTime=0;});
+    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();});
     canvas.addEventListener('webglcontextrestored',()=>{try{initWebGL();resize();start();}catch(error){initFallback();resize();start();}});
     new ResizeObserver(resize).observe(scene);new ResizeObserver(resize).observe(composition);
     window.addEventListener('resize',resize,{passive:true});

@@ -2,11 +2,11 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
-const block=html.slice(html.indexOf('const updateSourceBounds=()=>{'),html.indexOf('const setupArray='));
+const block=html.slice(html.indexOf('const needsIntroFields=()=>'),html.indexOf('const setupArray='));
 const calculate=new Function('DEPTHS','state','fieldSamples','fieldWidth','fieldHeight','settingsValue','fieldMassScale','fieldKey','byId','LOCAL_LENS_SHIFT_LIMIT','LOCAL_LENS_MAX_STRENGTH','sourceViewports','FOCUS_MASS','WAVE_SHIFT',
   `let sourceBoundsKey='';${block}updateSourceBounds();return sourceViewports;`);
 const W=1280,H=720,nx=64,ny=36;
-const state={width:W,height:H,centerX:640,centerY:395,halfWidth:390,halfHeight:63.5,radius:32};
+const state={intro:{progress:1},submission:null,width:W,height:H,centerX:640,centerY:395,halfWidth:390,halfHeight:63.5,radius:32};
 const fields=Array.from({length:3},(_,layer)=>Float32Array.from({length:nx*ny*4},(_,i)=>{
  const x=Math.floor(i/4)%nx,y=Math.floor(i/4/nx);
  return i%4===0?Math.sin(x*.4)*80*(layer+1):i%4===1?Math.cos(y*.5)*60*(layer+1):0;

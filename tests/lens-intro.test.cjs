@@ -82,3 +82,26 @@ test('compact start is radial and transient quadrature approximates the final ex
  }
  assert.ok(error<2,`transient quadrature differs by ${error}px`);
 });
+test('submission closes to a circle, removes its mass for one second, then reopens',()=>{
+ const s=I.SUBMIT_TIMING,fadeEnd=s.collapse+s.fade,appearStart=fadeEnd+s.hidden,openStart=appearStart+s.appear;
+ assert.equal(s.hidden,1);assert.equal(s.collapse,1);assert.equal(s.open,1);
+ assert.equal(I.submission(0).progress,1);
+ assert.equal(I.submission(s.collapse).progress,0);
+ assert.equal(I.submission(s.collapse).mass,1);
+ for(const t of [fadeEnd,fadeEnd+.5,appearStart-1e-6]){
+  const p=I.submission(t);assert.equal(p.stage,'hidden');assert.equal(p.mass,0);assert.equal(p.photon,0);assert.equal(p.content,0);
+ }
+ assert.equal(I.submission(appearStart).mass,0);
+ assert.equal(I.submission(openStart).mass,1);
+ assert.equal(I.submission(openStart).progress,0);
+ assert.deepEqual(I.submission(I.SUBMIT_END),{mass:1,progress:1,stage:'idle',copy:1,photon:0,rim:1,content:1});
+ // Every join is continuous, including a frame that skips across a boundary.
+ for(const t of [s.collapse,fadeEnd,appearStart,openStart,I.SUBMIT_END]){
+  const a=I.submission(t-1e-6),b=I.submission(t+1e-6);
+  for(const key of ['mass','progress','photon','rim','content'])assert.ok(Math.abs(a[key]-b[key])<1e-6,key+' discontinuity');
+ }
+ for(let t=0;t<=I.SUBMIT_END;t+=.01){
+  const p=I.submission(t);assert.equal(p.copy,1);
+  for(const key of ['mass','progress','photon','rim','content'])assert.ok(p[key]>=0&&p[key]<=1);
+ }
+});

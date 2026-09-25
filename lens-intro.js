@@ -1,5 +1,5 @@
 /* Geometry and positive-mass keyframes for the circle-to-input opening.
- * All clocks are in the existing star-animation time (default speed is 2x).
+ * Intro uses star-animation time (default speed is 2x); UI cycles use seconds.
  */
 (function(root){
   'use strict';
@@ -8,7 +8,10 @@
   const MASS_START=STAR_DAMPING*3,MASS_DURATION=1.2;
   const MASS_END=MASS_START+MASS_DURATION,HOLD=1.2;
   const START=MASS_END+HOLD,DURATION=RESPONSE_SECONDS*2,END=START+DURATION,KEYFRAMES=8;
-  const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return t*t*t*(t*(t*6-15)+10);};
+  // Submission uses real seconds, independently of the star speed/pause.
+  const SUBMIT_TIMING={collapse:RESPONSE_SECONDS,fade:.35,hidden:1,appear:.45,open:RESPONSE_SECONDS};
+  const SUBMIT_END=Object.values(SUBMIT_TIMING).reduce((sum,t)=>sum+t,0);
+  const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return Math.max(0,Math.min(1,t*t*t*(t*(t*6-15)+10)));};
   // One finite response for opening, hover, focus and the submission reset.
   function response(value){
     const t=Math.max(0,Math.min(1,value)),u=t*8;
@@ -23,6 +26,18 @@
     const progress=response((time-START)/DURATION);
     const photon=ease(.05,.85,mass)*(1-ease(.02,.8,progress));
     return {mass,progress,photon,rim:ease(.12,.85,progress),copy:ease(.35,.93,progress),content:ease(.68,1,progress)};
+  }
+  function submission(time){
+    const t=Math.max(0,time),s=SUBMIT_TIMING;
+    const fadeEnd=s.collapse+s.fade,hiddenEnd=fadeEnd+s.hidden,appearEnd=hiddenEnd+s.appear;
+    let progress=0,mass=1,stage='collapsing';
+    if(t<s.collapse)progress=1-response(t/s.collapse);
+    else if(t<fadeEnd){mass=1-response((t-s.collapse)/s.fade);stage='disappearing';}
+    else if(t<hiddenEnd){mass=0;stage='hidden';}
+    else if(t<appearEnd){mass=response((t-hiddenEnd)/s.appear);stage='appearing';}
+    else {progress=response((t-appearEnd)/s.open);stage=t<SUBMIT_END?'opening':'idle';}
+    return {mass,progress,stage,copy:1,photon:ease(.05,.85,mass)*(1-ease(.02,.8,progress)),
+      rim:ease(.12,.85,progress),content:ease(.68,1,progress)};
   }
   function shape(final,width,height,progress){
     const mix=(a,b)=>a+(b-a)*progress;
@@ -64,6 +79,6 @@
     const epsilon=core+(coarse.epsilon-core)*progress;
     return {...coarse,samples,epsilon};
   }
-  const api={STAR_DAMPING,RESPONSE_SECONDS,MASS_START,MASS_END,HOLD,START,END,KEYFRAMES,response,transition,timeline,shape,coarsen,massAt};
+  const api={STAR_DAMPING,RESPONSE_SECONDS,MASS_START,MASS_END,HOLD,START,END,KEYFRAMES,SUBMIT_TIMING,SUBMIT_END,response,transition,timeline,submission,shape,coarsen,massAt};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.GravityIntro=api;
 })(typeof window==='object'?window:globalThis);

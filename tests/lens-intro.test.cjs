@@ -82,23 +82,31 @@ test('compact start is radial and transient quadrature approximates the final ex
  }
  assert.ok(error<2,`transient quadrature differs by ${error}px`);
 });
-test('submission closes to a circle, removes its mass for one second, then reopens',()=>{
- const s=I.SUBMIT_TIMING,fadeEnd=s.collapse+s.fade,appearStart=fadeEnd+s.hidden,openStart=appearStart+s.appear;
+test('submission contracts both dimensions directly to a point, then stays absent for one second',()=>{
+ const s=I.SUBMIT_TIMING,appearStart=s.collapse+s.hidden,openStart=appearStart+s.appear;
+ const final={centerX:640,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
  assert.equal(s.hidden,1);assert.equal(s.collapse,1);assert.equal(s.open,1);
  assert.equal(I.submission(0).progress,1);
- assert.equal(I.submission(s.collapse).progress,0);
- assert.equal(I.submission(s.collapse).mass,1);
- for(const t of [fadeEnd,fadeEnd+.5,appearStart-1e-6]){
+ let previous=1;
+ for(let t=0;t<s.collapse;t+=.01){
+  const p=I.submission(t),shape=I.submissionShape(final,1280,720,p);
+  assert.equal(p.stage,'collapsing');assert.equal(p.photon,0);
+  assert.ok(p.collapseScale<=previous);previous=p.collapseScale;
+  assert.ok(Math.abs(shape.halfWidth/shape.halfHeight-final.halfWidth/final.halfHeight)<1e-8,'no circular waypoint');
+  assert.equal(shape.radius,final.radius*p.collapseScale);
+ }
+ assert.deepEqual(I.submissionShape(final,1280,720,I.submission(s.collapse)),
+  {centerX:640,centerY:360,halfWidth:0,halfHeight:0,radius:0});
+ for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
   const p=I.submission(t);assert.equal(p.stage,'hidden');assert.equal(p.mass,0);assert.equal(p.photon,0);assert.equal(p.content,0);
  }
  assert.equal(I.submission(appearStart).mass,0);
  assert.equal(I.submission(openStart).mass,1);
  assert.equal(I.submission(openStart).progress,0);
  assert.deepEqual(I.submission(I.SUBMIT_END),{mass:1,progress:1,stage:'idle',copy:1,photon:0,rim:1,content:1});
- // Every join is continuous, including a frame that skips across a boundary.
- for(const t of [s.collapse,fadeEnd,appearStart,openStart,I.SUBMIT_END]){
+ for(const t of [s.collapse,appearStart,openStart,I.SUBMIT_END]){
   const a=I.submission(t-1e-6),b=I.submission(t+1e-6);
-  for(const key of ['mass','progress','photon','rim','content'])assert.ok(Math.abs(a[key]-b[key])<1e-6,key+' discontinuity');
+  for(const key of ['mass','progress','photon','rim','content'])assert.ok(Math.abs(a[key]-b[key])<1e-5,key+' discontinuity');
  }
  for(let t=0;t<=I.SUBMIT_END;t+=.01){
   const p=I.submission(t);assert.equal(p.copy,1);

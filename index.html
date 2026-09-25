@@ -187,7 +187,7 @@
   </main>
   <script src="mass-profiles.js"></script>
   <script src="mass-lens.js"></script>
-  <script src="lens-intro.js?v=14"></script>
+  <script src="lens-intro.js?v=15"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
   <script src="star-flow.js?v=1"></script>
@@ -496,7 +496,8 @@
       uniform float activeLayers[${DEPTHS.length}];
       uniform float sourceSlots[${DEPTHS.length}];
       uniform vec4 sourceViewports[${DEPTHS.length}];
-      uniform bool fieldLinear, gridEnabled, rimEnabled, introEnabled, maskOpaque;
+      uniform vec4 detailViewports[${DEPTHS.length}];
+      uniform bool fieldLinear, gridEnabled, rimEnabled, introEnabled, maskOpaque, sourceCascaded;
       uniform int gridLayer;
       in vec2 textureUV;
       out vec4 outputColor;
@@ -523,16 +524,32 @@
         if(probeDepth<current)return i==0?1.0:clamp((1.0/probeDepth-1.0/sourcePlanes[i-1])/(1.0/current-1.0/sourcePlanes[i-1]),0.0,1.0);
         return i==${DEPTHS.length-1}?1.0:clamp((1.0/probeDepth-1.0/sourcePlanes[i+1])/(1.0/current-1.0/sourcePlanes[i+1]),0.0,1.0);
       }
+      float detailMargin(vec2 uv,int layer) {
+        vec4 viewport=detailViewports[layer];
+        vec2 p=uv*resolution-viewport.xy;
+        vec2 bounds=min(p,viewport.zw-p);
+        return min(bounds.x,bounds.y);
+      }
+      vec3 sourceSample(vec2 uv,vec4 viewport,float slot) {
+        vec2 sourceUv=(uv*resolution-viewport.xy)/viewport.zw;
+        vec2 bounds=min(sourceUv,1.0-sourceUv)*viewport.zw;
+        return texture(starImage,vec3(clamp(sourceUv,0.0,1.0),slot)).rgb/storageScale
+          *smoothstep(0.0,2.0,min(bounds.x,bounds.y));
+      }
       vec3 sourceLight(vec2 uv,int layer) {
         if(probeMode>.5) {
           vec2 delta=(uv*resolution-searchBox.xy-probeSource)/2.0;
           return vec3(1.4,2.1,3.2)*exp(-.5*dot(delta,delta))*probeWeight(layer);
         }
-        vec4 viewport=sourceViewports[layer];
-        vec2 sourceUv=(uv*resolution-viewport.xy)/viewport.zw;
-        vec2 bounds=min(sourceUv,1.0-sourceUv)*viewport.zw;
-        return texture(starImage,vec3(clamp(sourceUv,0.0,1.0),sourceSlots[layer])).rgb/storageScale
-          *smoothstep(0.0,2.0,min(bounds.x,bounds.y));
+        if(!sourceCascaded)return sourceSample(uv,detailViewports[layer],sourceSlots[layer]);
+        // Keep the ordinary field at its settled texel density. Only distant
+        // sources brought in by the compact lens use the outer reservoir.
+        // The inner guard exceeds the largest sprite's 27px half-size.
+        float detail=smoothstep(28.0,44.0,detailMargin(uv,layer));
+        if(detail>=1.0)return sourceSample(uv,detailViewports[layer],sourceSlots[layer]);
+        vec3 outer=sourceSample(uv,sourceViewports[layer],sourceSlots[layer]+2.0);
+        if(detail<=0.0)return outer;
+        return mix(outer,sourceSample(uv,detailViewports[layer],sourceSlots[layer]),detail);
       }
       vec3 linearToDisplay(vec3 c) {
         c=c/(1.0+c);
@@ -602,7 +619,9 @@
           if((renderStage==1||probeMode<.5)&&activeLayers[i]<.5)continue;
           vec2 uv=sourceUV(viewUV,i,localWeight);
           vec2 dx=dFdx(uv)*.25,dy=dFdy(uv)*.25;
-          vec2 pixels=probeMode>.5?resolution:resolution/sourceViewports[i].zw*vec2(textureSize(starImage,0).xy);
+          // Resolve the finest participating cascade throughout its blend band.
+          vec2 sampleSpan=sourceCascaded&&detailMargin(uv,i)<=28.0?sourceViewports[i].zw:detailViewports[i].zw;
+          vec2 pixels=probeMode>.5?resolution:resolution/sampleSpan*vec2(textureSize(starImage,0).xy);
           if(max(length(dx*pixels),length(dy*pixels))>.26) {
             light+=(sourceLight(uv-dx-dy,i)+sourceLight(uv+dx-dy,i)
               +sourceLight(uv-dx+dy,i)+sourceLight(uv+dx+dy,i))*.25;
@@ -652,7 +671,7 @@
       const profiler=null;
       const starsProgram=compileProgram(starVertex,starFragment),lensProgram=compileProgram(screenVertex,lensFragment),fieldProgram=compileProgram(screenVertex,fieldFragment);
       const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowOffset wrapAxes recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
-      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox waveBox waveStyle cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
+      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox waveBox waveStyle cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] detailViewports[0] sourceCascaded fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
       const fieldU=locations(fieldProgram,'massCells cellCount softening focal sourceDepth resolution projectionCenter');
       const starVAO=gl.createVertexArray(),screenVAO=gl.createVertexArray();gl.bindVertexArray(starVAO);
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,stars,gl.STATIC_DRAW);
@@ -697,7 +716,7 @@
       const batchActive=new Float32Array(DEPTHS.length),sourceSlots=new Float32Array(DEPTHS.length);
       let targetKey='',sourceSizingKey='',lightKey='',fieldKey='',targetWidth=0,targetHeight=0;
       let sourceBoundsKey='',fieldWidth=0,fieldHeight=0;
-      const fieldSamples=[],sourceViewports=new Float32Array(DEPTHS.length*4);
+      const fieldSamples=[],sourceViewports=new Float32Array(DEPTHS.length*4),detailViewports=new Float32Array(DEPTHS.length*4);
       const needsIntroFields=()=>state.intro.progress<1||state.submission!==null;
       const introBoundMass=()=>Math.max(settingsValue.gravity,state.submission?FOCUS_MASS:0)*fieldMassScale;
       const updateSourceBounds=()=>{
@@ -734,6 +753,16 @@
             }
           }
           const reserve=LOCAL_LENS_SHIFT_LIMIT*LOCAL_LENS_MAX_STRENGTH;
+          const padding=2*WAVE_SHIFT+4+2*cellSpan;
+          const storeViewport=(destination,l,b,r,t)=>{
+            const cx=(l+r)*.5,cy=(b+t)*.5;
+            const scale=Math.max((r-l+padding)/W,(t-b+padding)/H);
+            destination.set([cx-W*scale*.5,cy-H*scale*.5,W*scale,H*scale],layer*4);
+          };
+          // Capture the stable field before reserving the much wider compact-
+          // mass rays. Submission must not spread these same texels farther out.
+          storeViewport(detailViewports,Math.min(left,localLeft-reserve),Math.min(bottom,localBottom-reserve),
+            Math.max(right,localRight+reserve),Math.max(top,localTop+reserve));
           if(needsIntroFields()&&introBounds){
             // The union covers every interpolated keyframe without rebuilding
             // source textures each animation frame. Include the moving centre.
@@ -745,12 +774,9 @@
           }
           left=Math.min(left,localLeft-reserve);right=Math.max(right,localRight+reserve);
           bottom=Math.min(bottom,localBottom-reserve);top=Math.max(top,localTop+reserve);
-          const cx=(left+right)*.5,cy=(bottom+top)*.5;
           // Reserve the largest local offset once, also at zero boost. Moving
           // the boost slider then cannot change source resolution outside its band.
-          const padding=2*WAVE_SHIFT+4+2*cellSpan;
-          const scale=Math.max((right-left+padding)/W,(top-bottom+padding)/H);
-          sourceViewports.set([cx-W*scale*.5,cy-H*scale*.5,W*scale,H*scale],layer*4);
+          storeViewport(sourceViewports,left,bottom,right,top);
         }
         sourceBoundsKey=key;
       };
@@ -849,14 +875,19 @@
       const resizeSources=()=>{
         const sizingKey=sourceBoundsKey+','+canvas.width+','+canvas.height;
         if(sizingKey===sourceSizingKey)return;
-        let viewScale=1;
-        for(let i=0;i<DEPTHS.length;i++)viewScale=Math.max(viewScale,sourceViewports[i*4+3]/state.height);
+        let viewScale=1,outerScale=1;
+        for(let i=0;i<DEPTHS.length;i++){
+          viewScale=Math.max(viewScale,detailViewports[i*4+3]/state.height);
+          outerScale=Math.max(outerScale,sourceViewports[i*4+3]/state.height);
+        }
         const maxTexture=gl.getParameter(gl.MAX_TEXTURE_SIZE);
         const scale=Math.min(viewScale,maxTexture/canvas.width,maxTexture/canvas.height,Math.sqrt(320*1024*1024/(canvas.width*canvas.height*SOURCE_BATCH_SIZE*8)));
         const width=Math.max(1,Math.floor(canvas.width*scale)),height=Math.max(1,Math.floor(canvas.height*scale));
         const key=width+','+height;
         if(key!==targetKey){setupArray(starTexture,width,height,false,SOURCE_BATCH_SIZE);targetWidth=width;targetHeight=height;targetKey=key;}
         canvas.dataset.sourcePixelRatio=(targetHeight/(state.height*viewScale)).toFixed(3);
+        canvas.dataset.outerSourcePixelRatio=(targetHeight/(state.height*outerScale)).toFixed(3);
+        canvas.dataset.sourceAtlasBytes=String(targetWidth*targetHeight*SOURCE_BATCH_SIZE*8);
         sourceSizingKey=sizingKey;
       };
       resizeTarget=()=>{
@@ -972,6 +1003,10 @@
         gl.uniform4f(lensU.waveStyle,wave.duration,wave.strength,wave.stroke,wave.decay);
         gl.uniform1f(lensU.pulseAge,waveAge<wave.duration?waveAge:100);
         gl.uniform4fv(lensU['sourceViewports[0]'],sourceViewports);
+        gl.uniform4fv(lensU['detailViewports[0]'],detailViewports);
+        const cascadedSources=needsIntroFields()&&state.intro.mass>0&&state.intro.progress<1;
+        gl.uniform1i(lensU.sourceCascaded,cascadedSources?1:0);
+        canvas.dataset.sourceCascaded=String(cascadedSources);
         gl.uniform1i(lensU.fieldLinear,fieldLinear?1:0);
         gl.uniform1i(lensU.gridEnabled,grid.enabled?1:0);gl.uniform1i(lensU.gridLayer,grid.layer);
         gl.uniform1f(lensU.elapsed,state.time);gl.uniform1i(lensU.rimEnabled,byId('rim-effects').checked?1:0);
@@ -982,17 +1017,23 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER,lightTarget);gl.clear(gl.COLOR_BUFFER_BIT);
         const layers=[];
         for(let i=0;i<DEPTHS.length;i++)if(probe.enabled?GravityPhysics.depthWeight(probe.depth,i)>0:buckets.counts[i]>0)layers.push(i);
-        for(let start=0;start<layers.length;start+=SOURCE_BATCH_SIZE){
+        // The same four atlas slots hold either four ordinary depths, or two
+        // detail/outer pairs. Transient coverage never raises the memory cap.
+        const batchSize=cascadedSources?SOURCE_BATCH_SIZE/2:SOURCE_BATCH_SIZE;
+        for(let start=0;start<layers.length;start+=batchSize){
           batchActive.fill(0);
           gl.useProgram(starsProgram);gl.bindVertexArray(starVAO);gl.bindFramebuffer(gl.FRAMEBUFFER,target);gl.viewport(0,0,targetWidth,targetHeight);
-          for(let slot=0;slot<SOURCE_BATCH_SIZE&&start+slot<layers.length;slot++){
+          for(let slot=0;slot<batchSize&&start+slot<layers.length;slot++){
             const i=layers[start+slot];batchActive[i]=1;sourceSlots[i]=slot;
             if(probe.enabled)continue;
-            gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,starTexture,0,slot);gl.clear(gl.COLOR_BUFFER_BIT);
             gl.uniform3f(starU.sourceDepths,DEPTHS[i-1]||0,DEPTHS[i],DEPTHS[i+1]||0);
-            gl.uniform4fv(starU.sourceViewport,sourceViewports.subarray(i*4,i*4+4));
-            gl.uniform1f(starU.pixelRatio,targetHeight/sourceViewports[i*4+3]);
-            gl.drawElements(gl.POINTS,buckets.counts[i],gl.UNSIGNED_INT,buckets.offsets[i]*4);
+            for(let cascade=0;cascade<(cascadedSources?2:1);cascade++){
+              const views=cascade?sourceViewports:detailViewports;
+              gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,starTexture,0,slot+cascade*batchSize);gl.clear(gl.COLOR_BUFFER_BIT);
+              gl.uniform4fv(starU.sourceViewport,views.subarray(i*4,i*4+4));
+              gl.uniform1f(starU.pixelRatio,targetHeight/views[i*4+3]);
+              gl.drawElements(gl.POINTS,buckets.counts[i],gl.UNSIGNED_INT,buckets.offsets[i]*4);
+            }
           }
           gl.bindFramebuffer(gl.FRAMEBUFFER,lightTarget);gl.viewport(0,0,canvas.width,canvas.height);gl.useProgram(lensProgram);gl.bindVertexArray(screenVAO);
           gl.uniform1fv(lensU['activeLayers[0]'],batchActive);gl.uniform1fv(lensU['sourceSlots[0]'],sourceSlots);gl.uniform1i(lensU.renderStage,1);
@@ -1078,7 +1119,7 @@
       state.formReveal=phase.rim;
       // The field keeps moving, but settled layout/ARIA values need no writes.
       // Resize and replay still invalidate the shape through this key.
-      const layoutKey=[phase.mass,phase.progress,phase.stage,state.width,state.height,state.centerX,state.centerY,state.halfWidth,state.halfHeight,state.radius].join(',');
+      const layoutKey=[phase.mass,phase.progress,phase.collapseCore,phase.stage,state.width,state.height,state.centerX,state.centerY,state.halfWidth,state.halfHeight,state.radius].join(',');
       if(phase.photon>0){
         const photonTime=state.submission?state.effectsTime:state.time;
         photonRing.style.opacity=String(phase.photon*(.94+.06*Math.sin(photonTime*2.8)));

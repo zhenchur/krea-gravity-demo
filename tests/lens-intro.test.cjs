@@ -82,26 +82,34 @@ test('compact start is radial and transient quadrature approximates the final ex
  }
  assert.ok(error<2,`transient quadrature differs by ${error}px`);
 });
-test('submission rapidly squeezes horizontally and waits for the entire wave before returning',()=>{
+test('submission gathers smoothly into one core and waits for the entire wave before returning',()=>{
  const s=I.SUBMIT_TIMING,appearStart=s.collapse+s.hidden,openStart=appearStart+s.appear;
  const final={centerX:640,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
- assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.4);assert.equal(s.open,1);
+ assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.65);assert.equal(s.open,1);
  assert.equal(I.submission(0).progress,1);
  let previous=1;
  for(let t=0;t<s.collapse;t+=.01){
   const p=I.submission(t),shape=I.submissionShape(final,1280,720,p);
   assert.equal(p.stage,'collapsing');assert.equal(p.photon,0);
   assert.ok(p.collapseScale<=previous);previous=p.collapseScale;
-  if(t<s.collapse*.8)assert.equal(shape.halfHeight,final.halfHeight,'height must hold during the horizontal squeeze');
+  if(t<s.collapse*.3)assert.equal(shape.halfHeight,final.halfHeight,'sides gather before the core contracts');
   assert.ok(shape.radius<=shape.halfHeight&&shape.radius<=shape.halfWidth);
   assert.ok(shape.halfWidth>0,'no intermediate stop');
  }
  const middle=I.submissionShape(final,1280,720,I.submission(s.collapse*.7));
- assert.ok(middle.halfWidth<final.halfWidth*.6);assert.equal(middle.halfHeight,final.halfHeight);
+ assert.ok(middle.halfWidth<final.halfWidth*.25);assert.ok(middle.halfHeight<final.halfHeight*.5);
  assert.deepEqual(I.submissionShape(final,1280,720,I.submission(s.collapse)),
   {centerX:640,centerY:360,halfWidth:0,halfHeight:0,radius:0});
  for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
   const p=I.submission(t);assert.equal(p.stage,'hidden');assert.equal(p.mass,0);assert.equal(p.photon,0);assert.equal(p.content,0);
+ }
+ // Velocity remains continuous where the centre begins contracting and
+ // where the straight spans vanish: this catches the previous min() kink.
+ const sample=t=>I.submissionShape(final,1280,720,I.submission(t));
+ for(const point of [0,s.collapse*.3,s.collapse*.86,s.collapse]){
+  const h=1e-5,a=sample(point-h),b=sample(point),c=sample(point+h);
+  for(const key of ['halfWidth','halfHeight','radius'])
+   assert.ok(Math.abs((b[key]-a[key])/h-(c[key]-b[key])/h)<.5,key+' velocity jump');
  }
  assert.equal(I.submission(appearStart).mass,0);
  assert.equal(I.submission(openStart).mass,1);

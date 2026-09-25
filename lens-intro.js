@@ -10,7 +10,7 @@
   const START=MASS_END+HOLD,DURATION=RESPONSE_SECONDS*2,END=START+DURATION,KEYFRAMES=8;
   // Submission uses real seconds, independently of the star speed/pause.
   const WAVES={submit:{duration:1.9,strength:1,stroke:1,decay:1},birth:{duration:.65,strength:.6,stroke:0,decay:2}};
-  const SUBMIT_TIMING={collapse:.4,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
+  const SUBMIT_TIMING={collapse:.65,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
   const SUBMIT_END=Object.values(SUBMIT_TIMING).reduce((sum,t)=>sum+t,0);
   const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return Math.max(0,Math.min(1,t*t*t*(t*(t*6-15)+10)));};
   // One finite response for opening, hover, focus and the submission reset.
@@ -32,12 +32,13 @@
     const t=Math.max(0,time),s=SUBMIT_TIMING;
     const hiddenEnd=s.collapse+s.hidden,appearEnd=hiddenEnd+s.appear;
     if(t<hiddenEnd){
-      // Pull the sides inward rapidly. Height is preserved until the last
-      // narrow core disappears, with no pause or separate circular stage.
-      const u=Math.min(1,t/s.collapse),scale=1-u*u;
-      return {mass:ease(0,.18,scale),progress:scale,collapseScale:scale,
+      // The long sides gather first while the core contracts slightly later.
+      // Both curves have zero endpoint velocity: no hard height clamp, sudden
+      // aspect-ratio change, or pause at a circular intermediate shape.
+      const u=Math.min(1,t/s.collapse),span=1-ease(0,.86,u),core=1-ease(.3,1,u);
+      return {mass:ease(0,.14,core),progress:span,collapseScale:span,collapseCore:core,
         stage:t<s.collapse?'collapsing':'hidden',copy:1,photon:0,
-        rim:ease(0,.06,scale),content:1-ease(0,.15,u)};
+        rim:ease(0,.08,core),content:1-ease(0,.22,u)};
     }
     let progress=0,mass=1,stage='collapsing';
     if(t<appearEnd){mass=response((t-hiddenEnd)/s.appear);stage='appearing';}
@@ -53,10 +54,13 @@
   }
   function submissionShape(final,width,height,phase){
     if(phase.collapseScale===undefined)return shape(final,width,height,phase.progress);
-    const s=phase.collapseScale;
-    const halfWidth=final.halfWidth*s,halfHeight=Math.min(final.halfHeight,halfWidth);
-    return {centerX:width/2+(final.centerX-width/2)*s,centerY:height/2+(final.centerY-height/2)*s,
-      halfWidth,halfHeight,radius:Math.min(final.radius+(final.halfHeight-final.radius)*(1-s),halfHeight)};
+    const span=phase.collapseScale,core=phase.collapseCore;
+    const halfHeight=final.halfHeight*core,halfWidth=halfHeight+(final.halfWidth-final.halfHeight)*span;
+    // Round into the shrinking core continuously; its tiny circular endpoint
+    // is already disappearing rather than becoming a separate animation step.
+    const radius=halfHeight-(final.halfHeight-final.radius)*core*span;
+    return {centerX:width/2+(final.centerX-width/2)*core,centerY:height/2+(final.centerY-height/2)*core,
+      halfWidth,halfHeight,radius};
   }
   function coarsen(model){
     // Merge positive quadrature cells; preserve mass, weighted centroid and

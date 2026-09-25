@@ -82,19 +82,22 @@ test('compact start is radial and transient quadrature approximates the final ex
  }
  assert.ok(error<2,`transient quadrature differs by ${error}px`);
 });
-test('submission contracts both dimensions directly to a point, then stays absent for one second',()=>{
+test('submission rapidly squeezes horizontally and waits for the entire wave before returning',()=>{
  const s=I.SUBMIT_TIMING,appearStart=s.collapse+s.hidden,openStart=appearStart+s.appear;
  const final={centerX:640,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
- assert.equal(s.hidden,1);assert.equal(s.collapse,1);assert.equal(s.open,1);
+ assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.4);assert.equal(s.open,1);
  assert.equal(I.submission(0).progress,1);
  let previous=1;
  for(let t=0;t<s.collapse;t+=.01){
   const p=I.submission(t),shape=I.submissionShape(final,1280,720,p);
   assert.equal(p.stage,'collapsing');assert.equal(p.photon,0);
   assert.ok(p.collapseScale<=previous);previous=p.collapseScale;
-  assert.ok(Math.abs(shape.halfWidth/shape.halfHeight-final.halfWidth/final.halfHeight)<1e-8,'no circular waypoint');
-  assert.equal(shape.radius,final.radius*p.collapseScale);
+  if(t<s.collapse*.8)assert.equal(shape.halfHeight,final.halfHeight,'height must hold during the horizontal squeeze');
+  assert.ok(shape.radius<=shape.halfHeight&&shape.radius<=shape.halfWidth);
+  assert.ok(shape.halfWidth>0,'no intermediate stop');
  }
+ const middle=I.submissionShape(final,1280,720,I.submission(s.collapse*.7));
+ assert.ok(middle.halfWidth<final.halfWidth*.6);assert.equal(middle.halfHeight,final.halfHeight);
  assert.deepEqual(I.submissionShape(final,1280,720,I.submission(s.collapse)),
   {centerX:640,centerY:360,halfWidth:0,halfHeight:0,radius:0});
  for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
@@ -112,4 +115,11 @@ test('submission contracts both dimensions directly to a point, then stays absen
   const p=I.submission(t);assert.equal(p.copy,1);
   for(const key of ['mass','progress','photon','rim','content'])assert.ok(p[key]>=0&&p[key]<=1);
  }
+});
+
+test('birth ripple is brief and achromatic without a stroke; submission keeps its full wave',()=>{
+ assert.ok(I.WAVES.birth.duration<I.WAVES.submit.duration/2);
+ assert.equal(I.WAVES.birth.stroke,0);assert.equal(I.WAVES.submit.stroke,1);
+ assert.ok(I.WAVES.birth.strength>0&&I.WAVES.birth.strength<=1);
+ assert.ok(I.WAVES.birth.decay>I.WAVES.submit.decay);
 });

@@ -187,7 +187,7 @@
   </main>
   <script src="mass-profiles.js"></script>
   <script src="mass-lens.js"></script>
-  <script src="lens-intro.js?v=13"></script>
+  <script src="lens-intro.js?v=14"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
   <script src="star-flow.js?v=1"></script>
@@ -213,7 +213,7 @@
     const FLOW_SPEED = 110, RECYCLE_Z = -4000, FLOW_DEPTH = 12000;
     const HOVER_TRAVEL = 3240, FOCUS_MASS = 1.8;
     const INTERACTION_SECONDS = GravityIntro.RESPONSE_SECONDS;
-    const WAVE_SECONDS = 1.9, WAVE_SHIFT = 44;
+    const WAVE_SHIFT = 44;
     const FIELD_FOCAL = 1.80404776, FIELD_PADDING = 1.08;
     const LOCAL_LENS_SHIFT_LIMIT = 12, LOCAL_LENS_MAX_STRENGTH = 30;
     const SOURCE_BATCH_SIZE = 4;
@@ -238,8 +238,9 @@
       time: previewTime ?? restored.time ?? (reducedMotion.matches ? REDUCED_MOTION_TIME : 0),
       pointerX: 0, pointerY: 0, targetX: 0, targetY: 0,
       engagement: 0, activation: 0, overForm: false, hoverSuppressed: false, paused: previewTime!==null || reducedMotion.matches || restored.paused, visible: true, effectsTime: 0, pulse: -100, formReveal: 0,
-      intro:GravityIntro.timeline(0),lensShape:null,submission:null,waveShape:null
+      intro:GravityIntro.timeline(0),lensShape:null,submission:null,waveShape:null,waveStyle:GravityIntro.WAVES.submit
     };
+    state.birthWaveEmitted=state.time>=GravityIntro.MASS_START;
     const interactionTweens={engagement:{from:0,to:0,since:0},activation:{from:0,to:0,since:0}};
     const smooth = (a,b,x) => { const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*t*(t*(t*6-15)+10); };
     function motionAt(time) {
@@ -487,7 +488,7 @@
       uniform sampler2D accumulatedLight;
       uniform int renderStage;
       uniform vec2 resolution, probeSource;
-      uniform vec4 searchBox, waveBox;
+      uniform vec4 searchBox, waveBox, waveStyle;
       uniform float cornerRadius, waveRadius, mass, storageScale, pulseAge, probeMode, probeDepth, arrival;
       uniform float localStrength, localWidth, elapsed;
       uniform float introProgress;
@@ -585,14 +586,15 @@
         if(maskOpaque&&edge< -4.0){outputColor=vec4(0.0,0.0,0.0,renderStage==1?0.0:1.0);return;}
         // Anchor support to the visible form, even while the click wave passes.
         float localWeight=localEnvelope(outside);
-        float envelope=smoothstep(0.0,.06,pulseAge)*(1.0-smoothstep(.65,1.9,pulseAge));
+        float fade=1.0-smoothstep(waveStyle.x*(.65/1.9),waveStyle.x,pulseAge);
+        float envelope=smoothstep(0.0,.06,pulseAge)*mix(fade,fade*fade,step(1.5,waveStyle.w));
         vec2 waveOffset=textureUV*resolution-waveBox.xy;
         float waveDistance=boxDistance(waveOffset,waveBox.zw,waveRadius);
         float waveEdge=max(waveDistance,0.0)-pulseAge*230.0;
         float pulse=exp(-pow(waveEdge/(20.0+max(pulseAge,0.0)*7.0),2.0))*envelope;
         // Transient interaction wave is composed before the static physical map.
         // It does not change the fitted mass or add another population of stars.
-        vec2 viewUV=textureUV-boxNormal(waveOffset,waveBox.zw,waveRadius)*pulse*${WAVE_SHIFT.toFixed(1)}/resolution;
+        vec2 viewUV=textureUV-boxNormal(waveOffset,waveBox.zw,waveRadius)*pulse*${WAVE_SHIFT.toFixed(1)}*waveStyle.y/resolution;
         vec3 light=renderStage==2?texture(accumulatedLight,textureUV).rgb:vec3(0.0);
         if(renderStage!=2)for(int i=0;i<${DEPTHS.length};i++) {
           // Empty source slices contribute no radiance. Keep all physical
@@ -627,7 +629,7 @@
         float pixel=max(fwidth(outside),.001);
         float line=clamp((waveEdge+.3)/pixel+.5,0.0,1.0)-clamp((waveEdge-.3)/pixel+.5,0.0,1.0);
         // Keep the color edge only 0.6 CSS px wide; the displacement is broader.
-        light+=smoothstep(-.5,.5,waveDistance)*vec3(.5,.72,1.0)*line*envelope*.12;
+        light+=smoothstep(-.5,.5,waveDistance)*vec3(.5,.72,1.0)*line*envelope*.12*waveStyle.z;
         outputColor=vec4(linearToDisplay(light),1.0);
       }
     `;
@@ -650,7 +652,7 @@
       const profiler=null;
       const starsProgram=compileProgram(starVertex,starFragment),lensProgram=compileProgram(screenVertex,lensFragment),fieldProgram=compileProgram(screenVertex,fieldFragment);
       const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowOffset wrapAxes recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
-      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox waveBox cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
+      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox waveBox waveStyle cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
       const fieldU=locations(fieldProgram,'massCells cellCount softening focal sourceDepth resolution projectionCenter');
       const starVAO=gl.createVertexArray(),screenVAO=gl.createVertexArray();gl.bindVertexArray(starVAO);
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,stars,gl.STATIC_DRAW);
@@ -966,7 +968,9 @@
         gl.uniform1fv(lensU['sourcePlanes[0]'],DEPTHS);gl.uniform1f(lensU.arrival,arrival);gl.uniform1f(lensU.storageScale,1);
         // Original constant-speed propagation; retain the stronger deflection.
         const waveAge=state.effectsTime-state.pulse;
-        gl.uniform1f(lensU.pulseAge,waveAge<WAVE_SECONDS?waveAge:100);
+        const wave=state.waveStyle;
+        gl.uniform4f(lensU.waveStyle,wave.duration,wave.strength,wave.stroke,wave.decay);
+        gl.uniform1f(lensU.pulseAge,waveAge<wave.duration?waveAge:100);
         gl.uniform4fv(lensU['sourceViewports[0]'],sourceViewports);
         gl.uniform1i(lensU.fieldLinear,fieldLinear?1:0);
         gl.uniform1i(lensU.gridEnabled,grid.enabled?1:0);gl.uniform1i(lensU.gridLayer,grid.layer);
@@ -1052,6 +1056,14 @@
       // Use the animation clock so reveal, replay and pause stay synchronized.
       for(const animation of streakAnimations)animation.currentTime=state.time*1000;
       canvas.style.opacity=String(smooth(0,STAR_REVEAL_DURATION,state.time));
+      if(!state.birthWaveEmitted&&state.time>GravityIntro.MASS_START){
+        state.birthWaveEmitted=true;
+        // A short, uncoloured ripple from the newborn circular horizon.
+        // Account for a late frame without delaying the intro or replay.
+        const age=(state.time-GravityIntro.MASS_START)/Math.max(settingsValue.speed,.001);
+        if(age<GravityIntro.WAVES.birth.duration&&!state.submission)
+          launchWave(GravityIntro.shape(state,state.width,state.height,0),state.effectsTime-age,GravityIntro.WAVES.birth);
+      }
       state.intro=state.submission?GravityIntro.submission(state.effectsTime-state.submission.since):GravityIntro.timeline(state.time);
       if(state.submission&&!state.submission.waveEmitted&&state.effectsTime-state.submission.since>=GravityIntro.SUBMIT_TIMING.collapse){
         state.submission.waveEmitted=true;
@@ -1081,7 +1093,11 @@
       form.style.opacity=String(phase.mass);
       const shrinking=phase.collapseScale!==undefined;
       form.style.width=(shrinking?state.halfWidth:shape.halfWidth)*2+'px';
-      form.style.transform=`translate(${shape.centerX-state.centerX}px,${shape.centerY-state.centerY}px)${shrinking?` scale(${phase.collapseScale})`:''}`;
+      const sx=shrinking?shape.halfWidth/state.halfWidth:1,sy=shrinking?shape.halfHeight/state.halfHeight:1;
+      form.style.transform=`translate(${shape.centerX-state.centerX}px,${shape.centerY-state.centerY}px)${shrinking?` scale(${sx},${sy})`:''}`;
+      // Compensate corner radii so the horizontal squeeze keeps a round
+      // silhouette matching the shader, without reflowing the form's content.
+      form.style.borderRadius=shrinking?`${shape.radius/Math.max(sx,1e-6)}px / ${shape.radius/Math.max(sy,1e-6)}px`:'';
       form.style.setProperty('--prompt-radius',(shrinking?state.radius:shape.radius)+'px');
       form.style.setProperty('--frame-light',String(phase.rim));
       // Rotate the light around the contour, never the contour itself. Both
@@ -1106,7 +1122,7 @@
     }
     function resize() {
       // Measure the finished input, independently of the animated width/offset.
-      form.style.width='100%';form.style.transform='none';form.style.removeProperty('--prompt-radius');
+      form.style.width='100%';form.style.transform='none';form.style.removeProperty('border-radius');form.style.removeProperty('--prompt-radius');
       const rect=scene.getBoundingClientRect(),box=form.getBoundingClientRect();
       state.width=rect.width;state.height=rect.height;
       state.centerX=box.left-rect.left+box.width/2;state.centerY=box.top-rect.top+box.height/2;
@@ -1139,7 +1155,7 @@
       }
       updateArrival();renderer();start();
     }
-    function waveActive(){return state.effectsTime-state.pulse<WAVE_SECONDS;}
+    function waveActive(){return state.effectsTime-state.pulse<state.waveStyle.duration;}
     function interactionActive(){
       const focused=!state.submission&&document.activeElement===input?1:0,engaged=!state.submission&&(state.overForm||focused)?1:0;
       return state.activation!==focused||state.engagement!==engaged;
@@ -1166,11 +1182,13 @@
     form.addEventListener('pointerenter',()=>{state.overForm=!state.submission&&!state.hoverSuppressed;start();});
     form.addEventListener('pointerleave',()=>{state.overForm=false;if(!state.submission)state.hoverSuppressed=false;start();});
     input.addEventListener('focus',()=>{state.hoverSuppressed=false;start();});input.addEventListener('blur',start);
-    function launchWave(shape,at) {
+    function launchWave(shape,at,style=GravityIntro.WAVES.submit) {
       state.pulse=at;
-      state.waveShape=shape;
-      status.textContent='Импульс запущен. Это визуальная демка, без AI-генерации.';
-      clearTimeout(statusTimer);statusTimer=setTimeout(()=>{status.textContent='';},5500);
+      state.waveShape=shape;state.waveStyle=style;
+      if(style===GravityIntro.WAVES.submit){
+        status.textContent='Импульс запущен. Это визуальная демка, без AI-генерации.';
+        clearTimeout(statusTimer);statusTimer=setTimeout(()=>{status.textContent='';},5500);
+      }
       start();
       return true;
     }
@@ -1196,7 +1214,7 @@
     byId('replay').addEventListener('click',()=>{
       input.blur();
       fieldTranslation.reset();
-      state.time=0;state.effectsTime=0;state.pulse=-100;state.submission=null;state.waveShape=null;state.engagement=0;state.activation=0;state.overForm=false;state.hoverSuppressed=false;
+      state.time=0;state.birthWaveEmitted=false;state.effectsTime=0;state.pulse=-100;state.submission=null;state.waveShape=null;state.engagement=0;state.activation=0;state.overForm=false;state.hoverSuppressed=false;
       for(const tween of Object.values(interactionTweens)){tween.from=0;tween.to=0;tween.since=0;}
       state.pointerX=0;state.pointerY=0;
       state.paused=false;previousTime=0;framePacer.reset();renderQuality.resetSamples();

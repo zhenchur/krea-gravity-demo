@@ -9,7 +9,8 @@
   const MASS_END=MASS_START+MASS_DURATION,HOLD=1.2;
   const START=MASS_END+HOLD,DURATION=RESPONSE_SECONDS*2,END=START+DURATION,KEYFRAMES=8;
   // Submission uses real seconds, independently of the star speed/pause.
-  const SUBMIT_TIMING={collapse:RESPONSE_SECONDS,hidden:1,appear:.45,open:RESPONSE_SECONDS};
+  const WAVES={submit:{duration:1.9,strength:1,stroke:1,decay:1},birth:{duration:.65,strength:.6,stroke:0,decay:2}};
+  const SUBMIT_TIMING={collapse:.4,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
   const SUBMIT_END=Object.values(SUBMIT_TIMING).reduce((sum,t)=>sum+t,0);
   const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return Math.max(0,Math.min(1,t*t*t*(t*(t*6-15)+10)));};
   // One finite response for opening, hover, focus and the submission reset.
@@ -31,12 +32,12 @@
     const t=Math.max(0,time),s=SUBMIT_TIMING;
     const hiddenEnd=s.collapse+s.hidden,appearEnd=hiddenEnd+s.appear;
     if(t<hiddenEnd){
-      // One accelerating contraction in both dimensions, with no circular
-      // waypoint or slow tail before impact. The ray centres converge with it.
-      const u=Math.min(1,t/s.collapse),scale=1-u*u*u;
+      // Pull the sides inward rapidly. Height is preserved until the last
+      // narrow core disappears, with no pause or separate circular stage.
+      const u=Math.min(1,t/s.collapse),scale=1-u*u;
       return {mass:ease(0,.18,scale),progress:scale,collapseScale:scale,
         stage:t<s.collapse?'collapsing':'hidden',copy:1,photon:0,
-        rim:ease(0,.06,scale),content:1-ease(0,.2,u)};
+        rim:ease(0,.06,scale),content:1-ease(0,.15,u)};
     }
     let progress=0,mass=1,stage='collapsing';
     if(t<appearEnd){mass=response((t-hiddenEnd)/s.appear);stage='appearing';}
@@ -53,8 +54,9 @@
   function submissionShape(final,width,height,phase){
     if(phase.collapseScale===undefined)return shape(final,width,height,phase.progress);
     const s=phase.collapseScale;
+    const halfWidth=final.halfWidth*s,halfHeight=Math.min(final.halfHeight,halfWidth);
     return {centerX:width/2+(final.centerX-width/2)*s,centerY:height/2+(final.centerY-height/2)*s,
-      halfWidth:final.halfWidth*s,halfHeight:final.halfHeight*s,radius:final.radius*s};
+      halfWidth,halfHeight,radius:Math.min(final.radius+(final.halfHeight-final.radius)*(1-s),halfHeight)};
   }
   function coarsen(model){
     // Merge positive quadrature cells; preserve mass, weighted centroid and
@@ -90,6 +92,6 @@
     const epsilon=core+(coarse.epsilon-core)*progress;
     return {...coarse,samples,epsilon};
   }
-  const api={STAR_DAMPING,RESPONSE_SECONDS,MASS_START,MASS_END,HOLD,START,END,KEYFRAMES,SUBMIT_TIMING,SUBMIT_END,response,transition,timeline,submission,submissionShape,shape,coarsen,massAt};
+  const api={STAR_DAMPING,RESPONSE_SECONDS,MASS_START,MASS_END,HOLD,START,END,KEYFRAMES,WAVES,SUBMIT_TIMING,SUBMIT_END,response,transition,timeline,submission,submissionShape,shape,coarsen,massAt};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.GravityIntro=api;
 })(typeof window==='object'?window:globalThis);

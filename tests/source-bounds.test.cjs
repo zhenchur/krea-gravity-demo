@@ -13,6 +13,7 @@ const fields=Array.from({length:3},(_,layer)=>Float32Array.from({length:nx*ny*4}
 }));
 const focusMass=Number(html.match(/FOCUS_MASS = ([\d.]+)/)[1]);
 const waveShift=Number(html.match(/WAVE_SHIFT = ([\d.]+)/)[1]);
+const maxWaveStrength=Math.max(...Object.values(require('../lens-intro.js').WAVES).map(wave=>wave.strength));
 const bounds=(mass,boost=30,width=150)=>calculate([1,2,3],state,fields,nx,ny,{gravity:mass,localBoost:boost,localWidth:width},1,'fixture',()=>({max:'150'}),12,30,new Float32Array(12),focusMass,waveShift).sourceViewports;
 function sample(data,x,y){
  const gx=x/W*nx-.5,gy=y/H*ny-.5,ix=Math.floor(gx),iy=Math.floor(gy),fx=gx-ix,fy=gy-iy;
@@ -25,14 +26,13 @@ test('source bounds contain local deflection throughout focus and during the wav
  for(const mass of [0,.28,4]){
   const v=bounds(mass);
   for(const activation of [0,.5,1])for(let layer=0;layer<3;layer++)for(const width of [1,8,150])for(let n=0;n<1500;n++){
-   const x=random()*W,y=random()*H,angle=random()*Math.PI*2,wave=random()*waveShift;
-   // Covers every possible wave direction, including stricter-than-production
-   // excursions at viewport edges. Texture samples are clamped as in GLSL.
-   const vx=x+Math.cos(angle)*wave,vy=y+Math.sin(angle)*wave;
-   const s=sample(fields[layer],vx,vy).map(v=>v*(mass+(focusMass-mass)*activation));
-   const t=Math.max(0,Math.min(1,Math.max(0,distance(x,y))/width)),weight=(1-t)**3*(1+3*t+6*t*t);
+   const x=random()*W,y=random()*H,angle=random()*Math.PI*2,wave=random()*waveShift*maxWaveStrength;
+   // The impulse adds to the physical deflection, independently of the mass.
+   // Include the stronger birth wave in every possible outward direction.
+   const s=sample(fields[layer],x,y).map(v=>v*(mass+(focusMass-mass)*activation));
+   const t=Math.max(0,Math.min(1,Math.max(0,distance(x,y))/width)),weight=(1-t)**3;
    const gain=30*weight/Math.sqrt(1+(s[0]**2+s[1]**2)/144);
-   const sx=vx+s[0]*(1+gain),sy=vy+s[1]*(1+gain),i=layer*4;
+   const sx=x+s[0]*(1+gain)+Math.cos(angle)*wave,sy=y+s[1]*(1+gain)+Math.sin(angle)*wave,i=layer*4;
    assert.ok(sx>=v[i]-.01&&sx<=v[i]+v[i+2]+.01&&sy>=v[i+1]-.01&&sy<=v[i+1]+v[i+3]+.01,'Clipped source coordinate');
   }
  }
@@ -52,11 +52,24 @@ test('compact-mass coverage preserves settled source density within the same atl
   const scene={...state,width,height,centerX:width/2,centerY:height/2};
   const run=(scene,introBounds)=>calculate([1,2,3],scene,fields,nx,ny,{gravity:mass},1,'fixture',()=>({max:'150'}),12,30,new Float32Array(12),focusMass,waveShift,introBounds);
   const idle=run(scene),transient=run({...scene,intro:{progress:.25},submission:{}},largeBounds);
+  const cachedIdle=run(scene,largeBounds);
+  assert.deepEqual(cachedIdle.sourceViewports,transient.sourceViewports,'Submitting changed the cached outer coverage');
+  assert.deepEqual(cachedIdle.detailViewports,transient.detailViewports,'Submitting changed the cached detail coverage');
   assert.deepEqual(transient.detailViewports,idle.detailViewports,'Submission reduced the detail coverage scale');
   const a=allocate(scene,idle.detailViewports,idle.sourceViewports,dpr),b=allocate(scene,transient.detailViewports,transient.sourceViewports,dpr);
   assert.equal(b.width,a.width);assert.equal(b.height,a.height);assert.equal(b.sourcePixelRatio,a.sourcePixelRatio);
   assert.ok(Number(b.outerSourcePixelRatio)<Number(b.sourcePixelRatio),'Outer coverage was not isolated');
   assert.ok(Number(b.sourceAtlasBytes)<=320*1024*1024,'Atlas exceeded memory budget');
   assert.equal(b.sourceAtlasBytes,a.sourceAtlasBytes,'Submission allocated a larger atlas');
+ }
+});
+test('transient physical-map cache remains below 18 MiB in portrait and landscape',()=>{
+ const start=html.indexOf('const budget=12000,aspect='),end=html.indexOf('introWidth=w;',start);
+ assert.ok(start>=0&&end>start,'Compact physical-map sizing missing');
+ const size=new Function('state',`${html.slice(start,end)}return {w,h};`);
+ for(const [width,height] of [[1280,720],[390,844],[320,2048],[3840,2160],[10240,720]]){
+  const {w,h}=size({width,height});
+  assert.ok(w>=1&&h>=1,'Invalid cache dimensions');
+  assert.ok(w*h*8*24*8<=18*1024*1024,'Transient cache exceeded its memory budget');
  }
 });

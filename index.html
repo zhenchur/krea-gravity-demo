@@ -187,7 +187,7 @@
   </main>
   <script src="mass-profiles.js"></script>
   <script src="mass-lens.js"></script>
-  <script src="lens-intro.js?v=16"></script>
+  <script src="lens-intro.js?v=17"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
   <script src="star-flow.js?v=1"></script>
@@ -487,7 +487,7 @@
       uniform sampler2DArray starImage, rayField, introField;
       uniform sampler2D accumulatedLight;
       uniform int renderStage;
-      uniform vec2 resolution, probeSource;
+      uniform vec2 resolution, probeSource, fieldCenter;
       uniform vec4 searchBox, waveBox, waveStyle;
       uniform float cornerRadius, waveRadius, mass, storageScale, pulseAge, probeMode, probeDepth, arrival;
       uniform float localStrength, localWidth, elapsed;
@@ -570,8 +570,13 @@
         if(!introEnabled||introProgress>=1.0)return readRayField(rayField,uv,layer);
         float frame=clamp(introProgress,0.0,1.0)*8.0;
         int key=min(7,int(floor(frame)));
-        vec2 a=readRayField(introField,uv,key*${DEPTHS.length}+layer);
-        vec2 b=key==7?readRayField(rayField,uv,layer):readRayField(introField,uv,(key+1)*${DEPTHS.length}+layer);
+        // Cached frames were integrated at their opening positions. Recenter
+        // each physical field on the current form, so submission can contract
+        // in place without preparing another family of maps.
+        vec2 atA=uv+(mix(resolution*.5,fieldCenter,float(key)/8.0)-searchBox.xy)/resolution;
+        vec2 atB=uv+(mix(resolution*.5,fieldCenter,float(key+1)/8.0)-searchBox.xy)/resolution;
+        vec2 a=readRayField(introField,atA,key*${DEPTHS.length}+layer);
+        vec2 b=key==7?readRayField(rayField,atB,layer):readRayField(introField,atB,(key+1)*${DEPTHS.length}+layer);
         // Interpolate the ray map, never two already-rendered star images.
         return mix(a,b,fract(frame));
       }
@@ -609,15 +614,16 @@
         float waveDistance=boxDistance(waveOffset,waveBox.zw,waveRadius);
         float waveEdge=max(waveDistance,0.0)-pulseAge*230.0;
         float pulse=exp(-pow(waveEdge/(20.0+max(pulseAge,0.0)*7.0),2.0))*envelope;
-        // Transient interaction wave is composed before the static physical map.
-        // It does not change the fitted mass or add another population of stars.
-        vec2 viewUV=textureUV-boxNormal(waveOffset,waveBox.zw,waveRadius)*pulse*${WAVE_SHIFT.toFixed(1)}*waveStyle.y/resolution;
+        // Add the travelling impulse to the ray displacement, independently
+        // of the lens magnification. Focusing must not accelerate or stretch
+        // the wave front while the background mass is increasing.
+        vec2 waveShift=boxNormal(waveOffset,waveBox.zw,waveRadius)*pulse*${WAVE_SHIFT.toFixed(1)}*waveStyle.y/resolution;
         vec3 light=renderStage==2?texture(accumulatedLight,textureUV).rgb:vec3(0.0);
         if(renderStage!=2)for(int i=0;i<${DEPTHS.length};i++) {
           // Empty source slices contribute no radiance. Keep all physical
           // depths, but avoid fetching their textures for every screen pixel.
           if((renderStage==1||probeMode<.5)&&activeLayers[i]<.5)continue;
-          vec2 uv=sourceUV(viewUV,i,localWeight);
+          vec2 uv=sourceUV(textureUV,i,localWeight)-waveShift;
           vec2 dx=dFdx(uv)*.25,dy=dFdy(uv)*.25;
           // Resolve the finest participating cascade throughout its blend band.
           vec2 sampleSpan=sourceCascaded&&detailMargin(uv,i)<=28.0?sourceViewports[i].zw:detailViewports[i].zw;
@@ -641,7 +647,7 @@
         }
         if(gridEnabled) {
           // Source-plane Cartesian grid uses exactly the same inverse ray map.
-          vec2 source=sourceUV(viewUV,gridLayer,localWeight)*resolution-searchBox.xy;
+          vec2 source=(sourceUV(textureUV,gridLayer,localWeight)-waveShift)*resolution-searchBox.xy;
           float minor=gridLines(source,40.0,1.0),major=gridLines(source,160.0,1.3);
           light=light*.3+vec3(.055,.25,.42)*minor+vec3(.1,.38,.58)*major;
         }
@@ -671,7 +677,7 @@
       const profiler=null;
       const starsProgram=compileProgram(starVertex,starFragment),lensProgram=compileProgram(screenVertex,lensFragment),fieldProgram=compileProgram(screenVertex,fieldFragment);
       const starU=locations(starsProgram,'camera cameraRight cameraUp cameraForward resolution projectionCenter sourceViewport arrival elapsed expansion flowOffset wrapAxes recyclePlane largeStarFraction pixelRatio storageScale sourceDepths densityVariation');
-      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution searchBox waveBox waveStyle cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] detailViewports[0] sourceCascaded fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
+      const lensU=locations(lensProgram,'starImage rayField introField introEnabled introProgress accumulatedLight renderStage resolution fieldCenter searchBox waveBox waveStyle cornerRadius waveRadius mass arrival storageScale pulseAge probeMode probeSource probeDepth sourcePlanes[0] activeLayers[0] sourceSlots[0] sourceViewports[0] detailViewports[0] sourceCascaded fieldLinear gridEnabled gridLayer localStrength localWidth elapsed rimEnabled maskOpaque');
       const fieldU=locations(fieldProgram,'massCells cellCount softening focal sourceDepth resolution projectionCenter');
       const starVAO=gl.createVertexArray(),screenVAO=gl.createVertexArray();gl.bindVertexArray(starVAO);
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,stars,gl.STATIC_DRAW);
@@ -718,11 +724,13 @@
       let sourceBoundsKey='',fieldWidth=0,fieldHeight=0;
       const fieldSamples=[],sourceViewports=new Float32Array(DEPTHS.length*4),detailViewports=new Float32Array(DEPTHS.length*4);
       const needsIntroFields=()=>state.intro.progress<1||state.submission!==null;
-      const introBoundMass=()=>Math.max(settingsValue.gravity,state.submission?FOCUS_MASS:0)*fieldMassScale;
+      // Reserve the strongest focus state up front. Sending the form must not
+      // trigger a new ray-map reduction or synchronously read back from the GPU.
+      const introBoundMass=()=>Math.max(settingsValue.gravity,FOCUS_MASS)*fieldMassScale;
       const updateSourceBounds=()=>{
-        const key=fieldKey+','+settingsValue.gravity+','+(needsIntroFields()?'intro:'+introBoundMass():'steady');
+        const key=fieldKey+','+settingsValue.gravity+',intro:'+introBoundMass();
         if(key===sourceBoundsKey)return;
-        if(needsIntroFields()&&introKey===fieldKey&&introMassKey!==String(introBoundMass()))reduceIntroBounds();
+        if(introKey===fieldKey&&introMassKey!==String(introBoundMass()))reduceIntroBounds();
         const W=state.width,H=state.height,mass=settingsValue.gravity*fieldMassScale;
         // Reserve both ends of the focus animation once. Intermediate masses
         // are linear combinations, so focusing never resizes source textures.
@@ -731,7 +739,7 @@
         // 360px displacement. Reserving it around the entire screen wastes
         // source texels and makes every star look magnified from a tiny bitmap.
         const cellSpan=Math.hypot(W/fieldWidth,H/fieldHeight),localSupport=new Uint8Array(fieldWidth*fieldHeight);
-        const reach=Number(byId('localWidth').max)+WAVE_SHIFT+cellSpan;
+        const reach=Number(byId('localWidth').max)+WAVE_SHIFT*1.5+cellSpan;
         for(let y=0;y<fieldHeight;y++)for(let x=0;x<fieldWidth;x++){
           const qx=Math.abs((x+.5)/fieldWidth*W-state.centerX)-state.halfWidth+state.radius;
           const qy=Math.abs((y+.5)/fieldHeight*H-(H-state.centerY))-state.halfHeight+state.radius;
@@ -753,7 +761,7 @@
             }
           }
           const reserve=LOCAL_LENS_SHIFT_LIMIT*LOCAL_LENS_MAX_STRENGTH;
-          const padding=2*WAVE_SHIFT+4+2*cellSpan;
+          const padding=2*WAVE_SHIFT*1.5+4+2*cellSpan;
           const storeViewport=(destination,l,b,r,t)=>{
             const cx=(l+r)*.5,cy=(b+t)*.5;
             const scale=Math.max((r-l+padding)/W,(t-b+padding)/H);
@@ -763,14 +771,16 @@
           // mass rays. Submission must not spread these same texels farther out.
           storeViewport(detailViewports,Math.min(left,localLeft-reserve),Math.min(bottom,localBottom-reserve),
             Math.max(right,localRight+reserve),Math.max(top,localTop+reserve));
-          if(needsIntroFields()&&introBounds){
+          if(introBounds){
             // The union covers every interpolated keyframe without rebuilding
-            // source textures each animation frame. Include the moving centre.
+            // source textures each animation frame. Include keyframe recentering
+            // when the submission remains at the form's final position.
             const j=layer*8;
-            left=Math.min(left,introBounds[j]);right=Math.max(right,introBounds[j+2]);
-            bottom=Math.min(bottom,introBounds[j+1]);top=Math.max(top,introBounds[j+3]);
-            localLeft=Math.min(localLeft,introBounds[j+4]);localRight=Math.max(localRight,introBounds[j+6]);
-            localBottom=Math.min(localBottom,introBounds[j+5]);localTop=Math.max(localTop,introBounds[j+7]);
+            const dx=Math.abs(state.centerX-W*.5),dy=Math.abs(state.centerY-H*.5);
+            left=Math.min(left,introBounds[j]-dx);right=Math.max(right,introBounds[j+2]+dx);
+            bottom=Math.min(bottom,introBounds[j+1]-dy);top=Math.max(top,introBounds[j+3]+dy);
+            localLeft=Math.min(localLeft,introBounds[j+4]-dx);localRight=Math.max(localRight,introBounds[j+6]+dx);
+            localBottom=Math.min(localBottom,introBounds[j+5]-dy);localTop=Math.max(localTop,introBounds[j+7]+dy);
           }
           left=Math.min(left,localLeft-reserve);right=Math.max(right,localRight+reserve);
           bottom=Math.min(bottom,localBottom-reserve);top=Math.max(top,localTop+reserve);
@@ -789,21 +799,11 @@
         // precision while halving their GPU storage; source light stays RGBA16F.
         gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,fullPrecision?gl.RG32F:gl.RGBA16F,width,height,depth,0,fullPrecision?gl.RG:gl.RGBA,fullPrecision?gl.FLOAT:gl.HALF_FLOAT,null);
       };
-      // A complete placeholder keeps the optional sampler valid after a direct
-      // visit to an already-finished scene or in reduced-motion mode.
+      // A complete sampler while the initial geometry is being prepared.
       setupArray(introTexture,1,1,true,1);
       canvas.dataset.introMapBytes='8';
-      const releaseIntroFields=()=>{
-        if(!introKey)return;
-        // Keep only a complete 1x1 placeholder for the inactive sampler. Replay
-        // regenerates the maps lazily, before its animation clock starts.
-        gl.activeTexture(gl.TEXTURE3);setupArray(introTexture,1,1,true,1);
-        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,boundsTexture);
-        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,1,1,0,gl.RGBA,gl.FLOAT,null);
-        gl.activeTexture(gl.TEXTURE0);
-        introKey='';introMassKey='';introBounds=null;introWidth=1;introHeight=1;
-        canvas.dataset.introMapBytes='8';canvas.dataset.introMapSize='1x1';
-      };
+      canvas.dataset.introPreparationCount='0';
+      canvas.dataset.introBoundsReductionCount='0';
       const reduceIntroBounds=()=>{
         const w=introWidth,h=introHeight,count=GravityIntro.KEYFRAMES,depth=DEPTHS.length;
         const cols=Math.ceil(w/16),rows=Math.ceil(h/16),totalRows=rows*count*depth*2;
@@ -822,7 +822,7 @@
         const drift=Math.hypot(state.centerX-state.width*.5,state.centerY-state.height*.5);
         gl.uniform1i(u.fields,3);gl.uniform1i(u.tileSize,16);gl.uniform1f(u.mass,introBoundMass());
         gl.uniform2f(u.resolution,state.width,state.height);gl.uniform4fv(u['boxes[0]'],boxes);gl.uniform1fv(u['radii[0]'],radii);
-        gl.uniform1f(u.reach,Number(byId('localWidth').max)+WAVE_SHIFT+Math.hypot(state.width/w,state.height/h)+(state.halfWidth-state.halfHeight+drift)/count);
+        gl.uniform1f(u.reach,Number(byId('localWidth').max)+WAVE_SHIFT*1.5+Math.hypot(state.width/w,state.height/h)+(state.halfWidth-state.halfHeight+drift)/count);
         gl.viewport(0,0,cols,totalRows);gl.drawArrays(gl.TRIANGLES,0,3);
         const tiles=new Float32Array(cols*totalRows*4);gl.readPixels(0,0,cols,totalRows,gl.RGBA,gl.FLOAT,tiles);
         if(gl.getError()!==gl.NO_ERROR)throw new Error('Intro field bounds unavailable');
@@ -836,12 +836,19 @@
           }
         }
         introMassKey=String(introBoundMass());
+        canvas.dataset.introBoundsReductionCount=String(Number(canvas.dataset.introBoundsReductionCount)+1);
         gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
       };
       const prepareIntroFields=()=>{
         if(introKey===fieldKey)return;
         const started=performance.now(),count=GravityIntro.KEYFRAMES,depth=DEPTHS.length;
-        const w=Math.min(320,Math.floor(Math.sqrt(60000*state.width/state.height))),h=Math.max(64,Math.round(w*state.height/state.width));
+        // Retain a compact physical-map cache instead of deleting and rebuilding
+        // 87 MiB on every send. The fixed texel budget also bounds portrait views.
+        // Only transient deflection maps shrink; settled maps and star textures
+        // retain their existing resolution and floating-point precision.
+        const budget=12000,aspect=state.width/state.height;
+        const w=Math.max(1,Math.min(192,Math.floor(Math.sqrt(budget*aspect))));
+        const h=Math.max(1,Math.min(Math.floor(budget/w),Math.round(w/aspect)));
         introWidth=w;introHeight=h;
         gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,introTexture);
         gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,fieldLinear?gl.LINEAR:gl.NEAREST);
@@ -868,6 +875,7 @@
         reduceIntroBounds();
         introKey=fieldKey;sourceBoundsKey='';
         canvas.dataset.introPreparationMs=(performance.now()-started).toFixed(1);
+        canvas.dataset.introPreparationCount=String(Number(canvas.dataset.introPreparationCount)+1);
         canvas.dataset.introMapSize=w+'x'+h;
         canvas.dataset.introMapBytes=String(w*h*count*depth*8);
         gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.activeTexture(gl.TEXTURE0);
@@ -935,12 +943,14 @@
           }).scale;
           fieldKey=nextFieldKey;
         }
-        if(needsIntroFields())prepareIntroFields();
+        // Prepare even a settled preview before enabling interactions, then
+        // reuse the same physical fields for every collapse/reappearance.
+        prepareIntroFields();
         gl.bindFramebuffer(gl.FRAMEBUFFER,null);canvas.dataset.hdr='true';
       };
       renderer=()=>{
         if(gl.isContextLost())return;
-        if(needsIntroFields())prepareIntroFields();else releaseIntroFields();
+        prepareIntroFields();
         profiler?.begin();
         updateSourceBounds();
         resizeSources();
@@ -948,6 +958,8 @@
         const flowOffset=fieldTranslation.advance(motion.flow,flowDirection);
         buckets.reset();
         const projection=state.lensShape||state;
+        const cascadedSources=needsIntroFields()&&state.intro.mass>0&&state.intro.progress<1;
+        const bucketViewports=cascadedSources?sourceViewports:detailViewports;
         const densityVariation=1-settingsValue.uniformity;
         if(coordinateCache.variation!==densityVariation){recycleCycles.fill(-2147483648);coordinateCache.variation=densityVariation;}
         if(!probe.enabled) {
@@ -970,7 +982,7 @@
             let y=GravityStarFlow.wrap(recycleXY[i*2+1]*halfY*expansion+flowOffset[1],halfY);
             x=(x-camera.eye[0])*focal/depth+projection.centerX;
             y=(y-camera.eye[1])*focal/depth+state.height-projection.centerY;
-            buckets.add(i,depth,x,y,sourceViewports);
+            buckets.add(i,depth,x,y,bucketViewports);
           }
         }
         gl.clearColor(0,0,0,0);gl.viewport(0,0,targetWidth,targetHeight);
@@ -988,9 +1000,10 @@
         gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,introTexture);gl.uniform1i(lensU.introField,3);
         gl.uniform1i(lensU.introEnabled,state.intro.progress<1?1:0);gl.uniform1f(lensU.introProgress,state.intro.progress);
         gl.uniform1i(lensU.maskOpaque,state.intro.mass>=1?1:0);
+        gl.uniform2f(lensU.fieldCenter,state.centerX,state.height-state.centerY);
         gl.uniform2f(lensU.resolution,state.width,state.height);gl.uniform4f(lensU.searchBox,projection.centerX,state.height-projection.centerY,projection.halfWidth,projection.halfHeight);
         gl.uniform1f(lensU.cornerRadius,projection.radius);
-        const waveShape=state.waveShape||projection;
+        const waveShape=state.waveStyle===GravityIntro.WAVES.click?projection:(state.waveShape||projection);
         gl.uniform4f(lensU.waveBox,waveShape.centerX,state.height-waveShape.centerY,waveShape.halfWidth,waveShape.halfHeight);
         gl.uniform1f(lensU.waveRadius,waveShape.radius);
         gl.uniform1f(lensU.mass,(settingsValue.gravity+(FOCUS_MASS-settingsValue.gravity)*state.activation)*fieldMassScale*state.intro.mass);
@@ -1004,7 +1017,6 @@
         gl.uniform1f(lensU.pulseAge,waveAge<wave.duration?waveAge:100);
         gl.uniform4fv(lensU['sourceViewports[0]'],sourceViewports);
         gl.uniform4fv(lensU['detailViewports[0]'],detailViewports);
-        const cascadedSources=needsIntroFields()&&state.intro.mass>0&&state.intro.progress<1;
         gl.uniform1i(lensU.sourceCascaded,cascadedSources?1:0);
         canvas.dataset.sourceCascaded=String(cascadedSources);
         gl.uniform1i(lensU.fieldLinear,fieldLinear?1:0);
@@ -1103,12 +1115,12 @@
         // Account for a late frame without delaying the intro or replay.
         const age=(state.time-GravityIntro.MASS_START)/Math.max(settingsValue.speed,.001);
         if(age<GravityIntro.WAVES.birth.duration&&!state.submission)
-          launchWave({centerX:state.width/2,centerY:state.height/2,halfWidth:0,halfHeight:0,radius:0},state.effectsTime-age,GravityIntro.WAVES.birth);
+          launchWave(GravityIntro.shape(state,state.width,state.height,0),state.effectsTime-age,GravityIntro.WAVES.birth);
       }
       state.intro=state.submission?GravityIntro.submission(state.effectsTime-state.submission.since):GravityIntro.timeline(state.time);
       if(state.submission&&!state.submission.waveEmitted&&state.effectsTime-state.submission.since>=GravityIntro.SUBMIT_TIMING.collapse){
         state.submission.waveEmitted=true;
-        launchWave({centerX:state.width/2,centerY:state.height/2,halfWidth:0,halfHeight:0,radius:0},
+        launchWave({centerX:state.centerX,centerY:state.centerY,halfWidth:0,halfHeight:state.halfHeight,radius:0},
           state.submission.since+GravityIntro.SUBMIT_TIMING.collapse);
       }
       if(state.submission&&state.intro.stage==='idle'){
@@ -1119,7 +1131,7 @@
       state.formReveal=phase.rim;
       // The field keeps moving, but settled layout/ARIA values need no writes.
       // Resize and replay still invalidate the shape through this key.
-      const layoutKey=[phase.mass,phase.progress,phase.collapseCore,phase.stage,state.width,state.height,state.centerX,state.centerY,state.halfWidth,state.halfHeight,state.radius].join(',');
+      const layoutKey=[phase.mass,phase.progress,phase.collapseScale,phase.stage,state.width,state.height,state.centerX,state.centerY,state.halfWidth,state.halfHeight,state.radius].join(',');
       if(phase.photon>0){
         const photonTime=state.submission?state.effectsTime:state.time;
         photonRing.style.opacity=String(phase.photon*(.94+.06*Math.sin(photonTime*2.8)));
@@ -1161,10 +1173,16 @@
       canvas.dataset.renderDpr=String(dpr);canvas.dataset.targetFps=String(renderQuality.fps);
       canvas.dataset.mobile=String(renderQuality.mobile);
     }
-    function resize() {
+    let geometryKey='';
+    function resize(force=false) {
       // Measure the finished input, independently of the animated width/offset.
       form.style.width='100%';form.style.transform='none';form.style.removeProperty('border-radius');form.style.removeProperty('--prompt-radius');
       const rect=scene.getBoundingClientRect(),box=form.getBoundingClientRect();
+      renderQuality.nativeDpr=devicePixelRatio||1;
+      const nextKey=[rect.width,rect.height,box.left-rect.left,box.top-rect.top,box.width,box.height,
+        parseFloat(getComputedStyle(form).borderRadius),renderQuality.dpr].map(v=>Math.round(v*100)/100).join(',');
+      if(force!==true&&nextKey===geometryKey){updateArrival(true);return;}
+      geometryKey=nextKey;
       state.width=rect.width;state.height=rect.height;
       state.centerX=box.left-rect.left+box.width/2;state.centerY=box.top-rect.top+box.height/2;
       state.halfWidth=box.width/2;state.halfHeight=box.height/2;state.radius=parseFloat(getComputedStyle(form).borderRadius);
@@ -1245,19 +1263,16 @@
     form.addEventListener('submit',event=>{
       event.preventDefault();
       if(state.submission||form.inert)return;
-      const previousHeight=form.getBoundingClientRect().height;
-      input.value='';input.style.removeProperty('height');
+      // Preserve the current footprint during the cycle, including multiline
+      // input. Clearing text must not synchronously rebuild a different lens.
+      input.value='';
       // A pointer resting on the send button must not reactivate the field.
       state.overForm=false;state.hoverSuppressed=true;
       if(form.contains(document.activeElement))document.activeElement.blur();
-      if(Math.abs(form.getBoundingClientRect().height-previousHeight)>.01)resize();
       state.pulse=-100;state.waveShape=null;
       status.textContent='';clearTimeout(statusTimer);
       state.submission={since:state.effectsTime,waveEmitted:false};
-      updateArrival();renderer();
-      // Prepare the reusable circle/opening maps before starting this clock.
-      // Keep them for the entire cycle, then release them again at idle.
-      previousTime=0;framePacer.reset();start();
+      updateArrival();start();
     });
     byId('replay').addEventListener('click',()=>{
       input.blur();
@@ -1324,10 +1339,10 @@
     reducedMotion.addEventListener('change',event=>{state.paused=event.matches;if(event.matches)state.time=Math.max(state.time,REDUCED_MOTION_TIME);updateArrival();renderer();syncPause();});
     new IntersectionObserver(([entry])=>{state.visible=entry.isIntersecting;if(state.visible)start();else{cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();}},{threshold:0}).observe(scene);
 
-    try{initWebGL();resize();}catch(error){console.warn('3D fallback:',error.message);initFallback();resize();}
+    try{initWebGL();resize(true);}catch(error){console.warn('3D fallback:',error.message);initFallback();resize(true);}
 
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelAnimationFrame(frame);frame=0;previousTime=0;framePacer.reset();renderQuality.resetSamples();});
-    canvas.addEventListener('webglcontextrestored',()=>{try{initWebGL();resize();start();}catch(error){initFallback();resize();start();}});
+    canvas.addEventListener('webglcontextrestored',()=>{try{initWebGL();resize(true);start();}catch(error){initFallback();resize(true);start();}});
     new ResizeObserver(resize).observe(scene);new ResizeObserver(resize).observe(composition);
     window.addEventListener('resize',resize,{passive:true});
     syncPause();start();

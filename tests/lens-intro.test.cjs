@@ -82,57 +82,52 @@ test('compact start is radial and transient quadrature approximates the final ex
  }
  assert.ok(error<2,`transient quadrature differs by ${error}px`);
 });
-test('submission gathers smoothly into one core and waits for the entire wave before returning',()=>{
+test('submission accelerates horizontally into a line and waits for the entire wave before returning',()=>{
  const s=I.SUBMIT_TIMING,appearStart=s.collapse+s.hidden,openStart=appearStart+s.appear;
- const final={centerX:640,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
- assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.9);assert.equal(s.open,1);
- assert.equal(I.submission(0).progress,1);
- let previous=1;
- for(let t=0;t<s.collapse;t+=.01){
-  const p=I.submission(t),shape=I.submissionShape(final,1280,720,p);
-  assert.equal(p.stage,'collapsing');assert.equal(p.photon,0);
-  assert.ok(p.collapseScale<=previous);previous=p.collapseScale;
-  if(t<s.collapse*.3)assert.equal(shape.halfHeight,final.halfHeight,'sides gather before the core contracts');
-  assert.ok(shape.radius<=shape.halfHeight&&shape.radius<=shape.halfWidth);
-  assert.ok(shape.halfWidth>0,'no intermediate stop');
- }
- const middle=I.submissionShape(final,1280,720,I.submission(s.collapse*.7));
- assert.ok(middle.halfWidth<final.halfWidth*.6);assert.ok(middle.halfHeight>final.halfHeight*.75);
- assert.deepEqual(I.submissionShape(final,1280,720,I.submission(s.collapse)),
-  {centerX:640,centerY:360,halfWidth:0,halfHeight:0,radius:0});
- for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
-  const p=I.submission(t);assert.equal(p.stage,'hidden');assert.equal(p.mass,0);assert.equal(p.photon,0);assert.equal(p.content,0);
- }
- // Velocity remains continuous where the centre begins contracting and
- // where the straight spans vanish: this catches the previous min() kink.
+ const final={centerX:610,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
+ assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.7);assert.equal(s.open,1);
  const sample=t=>I.submissionShape(final,1280,720,I.submission(t));
- for(const point of [0,s.collapse*Math.sqrt(.3),s.collapse*Math.sqrt(.86),s.collapse]){
-  const h=1e-5,a=sample(point-h),b=sample(point),c=sample(point+h);
-  for(const key of ['halfWidth','halfHeight','radius'])
-   assert.ok(Math.abs((b[key]-a[key])/h-(c[key]-b[key])/h)<.5,key+' velocity jump');
+ assert.deepEqual(sample(0),final);
+ let previous=final.halfWidth;
+ for(let t=0;t<s.collapse;t+=.01){
+  const phase=I.submission(t),shape=sample(t);
+  assert.equal(phase.stage,'collapsing');assert.equal(phase.photon,0);
+  assert.ok(shape.halfWidth<=previous&&shape.halfWidth>0);previous=shape.halfWidth;
+  assert.equal(shape.halfHeight,final.halfHeight,'height must stay fixed through the complete squeeze');
+  assert.equal(shape.centerX,final.centerX);assert.equal(shape.centerY,final.centerY);
+  assert.ok(shape.radius<=shape.halfHeight&&shape.radius<=shape.halfWidth);
  }
- const startShape=sample(s.collapse*.2),gathered=sample(s.collapse*.65);
- assert.ok(final.halfWidth-startShape.halfWidth<.5,'first fifth must start almost imperceptibly');
- assert.ok(final.halfWidth-gathered.halfWidth>100,'the gentle start must accelerate into the collapse');
+ // A gently moving onset must accelerate, without the previous nearly static
+ // nested easing or a circular waypoint slowing down the final contraction.
+ const start=sample(s.collapse*.2),middle=sample(s.collapse*.5),late=sample(s.collapse*.8);
+ assert.ok(start.halfWidth<final.halfWidth&&start.halfWidth>final.halfWidth*.99);
+ assert.ok(final.halfWidth-middle.halfWidth>10*(final.halfWidth-start.halfWidth));
+ assert.ok(middle.halfWidth-late.halfWidth>final.halfWidth-middle.halfWidth);
+ assert.deepEqual(sample(s.collapse),{...final,halfWidth:0,radius:0});
+ for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
+  const phase=I.submission(t);assert.equal(phase.stage,'hidden');assert.equal(phase.mass,0);assert.equal(phase.photon,0);assert.equal(phase.content,0);
+ }
+ assert.deepEqual(sample(appearStart),{...final,halfWidth:final.halfHeight,radius:final.halfHeight},'returning circle stays at the final form centre');
  assert.equal(I.submission(appearStart).mass,0);
- assert.equal(I.submission(openStart).mass,1);
- assert.equal(I.submission(openStart).progress,0);
+ assert.equal(I.submission(openStart).mass,1);assert.equal(I.submission(openStart).progress,0);
  assert.deepEqual(I.submission(I.SUBMIT_END),{mass:1,progress:1,stage:'idle',copy:1,photon:0,rim:1,content:1});
+ assert.deepEqual(sample(I.SUBMIT_END),final);
  for(const t of [s.collapse,appearStart,openStart,I.SUBMIT_END]){
   const a=I.submission(t-1e-6),b=I.submission(t+1e-6);
   for(const key of ['mass','progress','photon','rim','content'])assert.ok(Math.abs(a[key]-b[key])<1e-5,key+' discontinuity');
  }
  for(let t=0;t<=I.SUBMIT_END;t+=.01){
-  const p=I.submission(t);assert.equal(p.copy,1);
-  for(const key of ['mass','progress','photon','rim','content'])assert.ok(p[key]>=0&&p[key]<=1);
+  const phase=I.submission(t);assert.equal(phase.copy,1);
+  const shape=sample(t);assert.equal(shape.centerX,final.centerX);assert.equal(shape.centerY,final.centerY);
+  for(const key of ['mass','progress','photon','rim','content'])assert.ok(phase[key]>=0&&phase[key]<=1);
  }
 });
 
-test('birth wave travels half as far with the same force; only pointer presses have a stroke',()=>{
+test('birth wave travels half as far with stronger displacement; only pointer presses have a stroke',()=>{
  const {submit,birth,click}=I.WAVES;
- // Propagation speed is shared, so half the lifetime is half the radius.
+ // Propagation speed is shared, so half the lifetime is half the outward range.
  assert.equal(birth.duration*2,submit.duration);
- assert.equal(birth.strength,submit.strength);assert.equal(birth.decay,submit.decay);
+ assert.equal(birth.strength,1.5*submit.strength);assert.equal(birth.decay,submit.decay);
  assert.equal(birth.stroke,0);assert.equal(submit.stroke,0);assert.equal(click.stroke,1);
  assert.equal(click.duration,submit.duration);assert.equal(click.strength,submit.strength);
 });

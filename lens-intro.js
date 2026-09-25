@@ -11,10 +11,10 @@
   // Submission uses real seconds, independently of the star speed/pause.
   const WAVES={
     submit:{duration:1.9,strength:1,stroke:0,decay:1},
-    birth:{duration:.95,strength:1,stroke:0,decay:1},
+    birth:{duration:.95,strength:1.5,stroke:0,decay:1},
     click:{duration:1.9,strength:1,stroke:1,decay:1}
   };
-  const SUBMIT_TIMING={collapse:.9,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
+  const SUBMIT_TIMING={collapse:.7,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
   const SUBMIT_END=Object.values(SUBMIT_TIMING).reduce((sum,t)=>sum+t,0);
   const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return Math.max(0,Math.min(1,t*t*t*(t*(t*6-15)+10)));};
   // One finite response for opening, hover, focus and the submission reset.
@@ -36,16 +36,12 @@
     const t=Math.max(0,time),s=SUBMIT_TIMING;
     const hiddenEnd=s.collapse+s.hidden,appearEnd=hiddenEnd+s.appear;
     if(t<hiddenEnd){
-      // The long sides gather first while the core contracts slightly later.
-      // Both curves have zero endpoint velocity: no hard height clamp, sudden
-      // aspect-ratio change, or pause at a circular intermediate shape.
-      const u=Math.min(1,t/s.collapse),pull=u*u;
-      // A quadratic time ramp gives the initial pull a very gentle onset,
-      // then accelerates into the same continuously rounding collapse.
-      const span=1-ease(0,.86,pull),core=1-ease(.3,1,pull);
-      return {mass:ease(0,.14,core),progress:span,collapseScale:span,collapseCore:core,
+      // A single accelerating horizontal squeeze. No nested easing or
+      // waiting at a circle: the height stays fixed until the line vanishes.
+      const u=Math.min(1,t/s.collapse),span=1-u*u*u;
+      return {mass:ease(0,.1,span),progress:span,collapseScale:span,
         stage:t<s.collapse?'collapsing':'hidden',copy:1,photon:0,
-        rim:ease(0,.08,core),content:1-ease(0,.22,pull)};
+        rim:ease(0,.12,span),content:1-ease(0,.3,u)};
     }
     let progress=0,mass=1,stage='collapsing';
     if(t<appearEnd){mass=response((t-hiddenEnd)/s.appear);stage='appearing';}
@@ -60,15 +56,18 @@
       radius:mix(final.halfHeight,final.radius)};
   }
   function submissionShape(final,width,height,phase){
-    if(phase.collapseScale===undefined)return shape(final,width,height,phase.progress);
-    const span=phase.collapseScale,core=phase.collapseCore;
-    const halfHeight=final.halfHeight*core,halfWidth=halfHeight+(final.halfWidth-final.halfHeight)*span;
-    // Round into the shrinking core continuously; its tiny circular endpoint
-    // is already disappearing rather than becoming a separate animation step.
-    const radius=halfHeight-(final.halfHeight-final.radius)*core*span;
-    return {centerX:width/2+(final.centerX-width/2)*core,centerY:height/2+(final.centerY-height/2)*core,
-      halfWidth,halfHeight,radius};
+    if(phase.collapseScale===undefined){
+      const result=shape(final,width,height,phase.progress);
+      // Only the initial intro travels from the screen centre. A submission
+      // returns at the same place, keeping the star projection stationary.
+      if(phase.stage){result.centerX=final.centerX;result.centerY=final.centerY;}
+      return result;
+    }
+    const span=phase.collapseScale;
+    return {centerX:final.centerX,centerY:final.centerY,
+      halfWidth:final.halfWidth*span,halfHeight:final.halfHeight,radius:final.radius*span};
   }
+
   function coarsen(model){
     // Merge positive quadrature cells; preserve mass, weighted centroid and
     // kernel radius. The exact final field replaces this transient quadrature.

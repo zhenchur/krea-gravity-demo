@@ -187,7 +187,7 @@
   </main>
   <script src="mass-profiles.js"></script>
   <script src="mass-lens.js"></script>
-  <script src="lens-intro.js?v=15"></script>
+  <script src="lens-intro.js?v=16"></script>
   <script src="lens-calibration.js"></script>
   <script src="star-buckets.js?v=2"></script>
   <script src="star-flow.js?v=1"></script>
@@ -1099,11 +1099,11 @@
       canvas.style.opacity=String(smooth(0,STAR_REVEAL_DURATION,state.time));
       if(!state.birthWaveEmitted&&state.time>GravityIntro.MASS_START){
         state.birthWaveEmitted=true;
-        // A short, uncoloured ripple from the newborn circular horizon.
+        // The same radial impulse as collapse, with half its travel distance.
         // Account for a late frame without delaying the intro or replay.
         const age=(state.time-GravityIntro.MASS_START)/Math.max(settingsValue.speed,.001);
         if(age<GravityIntro.WAVES.birth.duration&&!state.submission)
-          launchWave(GravityIntro.shape(state,state.width,state.height,0),state.effectsTime-age,GravityIntro.WAVES.birth);
+          launchWave({centerX:state.width/2,centerY:state.height/2,halfWidth:0,halfHeight:0,radius:0},state.effectsTime-age,GravityIntro.WAVES.birth);
       }
       state.intro=state.submission?GravityIntro.submission(state.effectsTime-state.submission.since):GravityIntro.timeline(state.time);
       if(state.submission&&!state.submission.waveEmitted&&state.effectsTime-state.submission.since>=GravityIntro.SUBMIT_TIMING.collapse){
@@ -1233,6 +1233,13 @@
       start();
       return true;
     }
+    form.addEventListener('pointerdown',event=>{
+      if(state.submission||form.inert||event.button!==0||event.isPrimary===false)return;
+      // Links and send have their own actions; only pressing the input's body
+      // emits the outlined wave. Keyboard focus never duplicates this pulse.
+      if(event.target.closest('button,a'))return;
+      launchWave({...state.lensShape},state.effectsTime,GravityIntro.WAVES.click);
+    });
     input.addEventListener('input',()=>{input.style.removeProperty('height');input.style.height=Math.min(input.scrollHeight,150)+'px';resize();});
     input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();form.requestSubmit();}});
     form.addEventListener('submit',event=>{

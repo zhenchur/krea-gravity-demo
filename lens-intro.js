@@ -9,8 +9,12 @@
   const MASS_END=MASS_START+MASS_DURATION,HOLD=1.2;
   const START=MASS_END+HOLD,DURATION=RESPONSE_SECONDS*2,END=START+DURATION,KEYFRAMES=8;
   // Submission uses real seconds, independently of the star speed/pause.
-  const WAVES={submit:{duration:1.9,strength:1,stroke:1,decay:1},birth:{duration:.65,strength:.6,stroke:0,decay:2}};
-  const SUBMIT_TIMING={collapse:.65,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
+  const WAVES={
+    submit:{duration:1.9,strength:1,stroke:0,decay:1},
+    birth:{duration:.95,strength:1,stroke:0,decay:1},
+    click:{duration:1.9,strength:1,stroke:1,decay:1}
+  };
+  const SUBMIT_TIMING={collapse:.9,hidden:WAVES.submit.duration,appear:.45,open:RESPONSE_SECONDS};
   const SUBMIT_END=Object.values(SUBMIT_TIMING).reduce((sum,t)=>sum+t,0);
   const ease=(a,b,value)=>{const t=Math.max(0,Math.min(1,(value-a)/(b-a)));return Math.max(0,Math.min(1,t*t*t*(t*(t*6-15)+10)));};
   // One finite response for opening, hover, focus and the submission reset.
@@ -35,10 +39,13 @@
       // The long sides gather first while the core contracts slightly later.
       // Both curves have zero endpoint velocity: no hard height clamp, sudden
       // aspect-ratio change, or pause at a circular intermediate shape.
-      const u=Math.min(1,t/s.collapse),span=1-ease(0,.86,u),core=1-ease(.3,1,u);
+      const u=Math.min(1,t/s.collapse),pull=u*u;
+      // A quadratic time ramp gives the initial pull a very gentle onset,
+      // then accelerates into the same continuously rounding collapse.
+      const span=1-ease(0,.86,pull),core=1-ease(.3,1,pull);
       return {mass:ease(0,.14,core),progress:span,collapseScale:span,collapseCore:core,
         stage:t<s.collapse?'collapsing':'hidden',copy:1,photon:0,
-        rim:ease(0,.08,core),content:1-ease(0,.22,u)};
+        rim:ease(0,.08,core),content:1-ease(0,.22,pull)};
     }
     let progress=0,mass=1,stage='collapsing';
     if(t<appearEnd){mass=response((t-hiddenEnd)/s.appear);stage='appearing';}

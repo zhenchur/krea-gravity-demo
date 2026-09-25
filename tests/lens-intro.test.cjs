@@ -85,7 +85,7 @@ test('compact start is radial and transient quadrature approximates the final ex
 test('submission gathers smoothly into one core and waits for the entire wave before returning',()=>{
  const s=I.SUBMIT_TIMING,appearStart=s.collapse+s.hidden,openStart=appearStart+s.appear;
  const final={centerX:640,centerY:399,halfWidth:390,halfHeight:63.5,radius:32};
- assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.65);assert.equal(s.open,1);
+ assert.equal(s.hidden,I.WAVES.submit.duration);assert.equal(s.collapse,.9);assert.equal(s.open,1);
  assert.equal(I.submission(0).progress,1);
  let previous=1;
  for(let t=0;t<s.collapse;t+=.01){
@@ -97,7 +97,7 @@ test('submission gathers smoothly into one core and waits for the entire wave be
   assert.ok(shape.halfWidth>0,'no intermediate stop');
  }
  const middle=I.submissionShape(final,1280,720,I.submission(s.collapse*.7));
- assert.ok(middle.halfWidth<final.halfWidth*.25);assert.ok(middle.halfHeight<final.halfHeight*.5);
+ assert.ok(middle.halfWidth<final.halfWidth*.6);assert.ok(middle.halfHeight>final.halfHeight*.75);
  assert.deepEqual(I.submissionShape(final,1280,720,I.submission(s.collapse)),
   {centerX:640,centerY:360,halfWidth:0,halfHeight:0,radius:0});
  for(const t of [s.collapse,s.collapse+.5,appearStart-1e-6]){
@@ -106,11 +106,14 @@ test('submission gathers smoothly into one core and waits for the entire wave be
  // Velocity remains continuous where the centre begins contracting and
  // where the straight spans vanish: this catches the previous min() kink.
  const sample=t=>I.submissionShape(final,1280,720,I.submission(t));
- for(const point of [0,s.collapse*.3,s.collapse*.86,s.collapse]){
+ for(const point of [0,s.collapse*Math.sqrt(.3),s.collapse*Math.sqrt(.86),s.collapse]){
   const h=1e-5,a=sample(point-h),b=sample(point),c=sample(point+h);
   for(const key of ['halfWidth','halfHeight','radius'])
    assert.ok(Math.abs((b[key]-a[key])/h-(c[key]-b[key])/h)<.5,key+' velocity jump');
  }
+ const startShape=sample(s.collapse*.2),gathered=sample(s.collapse*.65);
+ assert.ok(final.halfWidth-startShape.halfWidth<.5,'first fifth must start almost imperceptibly');
+ assert.ok(final.halfWidth-gathered.halfWidth>100,'the gentle start must accelerate into the collapse');
  assert.equal(I.submission(appearStart).mass,0);
  assert.equal(I.submission(openStart).mass,1);
  assert.equal(I.submission(openStart).progress,0);
@@ -125,9 +128,11 @@ test('submission gathers smoothly into one core and waits for the entire wave be
  }
 });
 
-test('birth ripple is brief and achromatic without a stroke; submission keeps its full wave',()=>{
- assert.ok(I.WAVES.birth.duration<I.WAVES.submit.duration/2);
- assert.equal(I.WAVES.birth.stroke,0);assert.equal(I.WAVES.submit.stroke,1);
- assert.ok(I.WAVES.birth.strength>0&&I.WAVES.birth.strength<=1);
- assert.ok(I.WAVES.birth.decay>I.WAVES.submit.decay);
+test('birth wave travels half as far with the same force; only pointer presses have a stroke',()=>{
+ const {submit,birth,click}=I.WAVES;
+ // Propagation speed is shared, so half the lifetime is half the radius.
+ assert.equal(birth.duration*2,submit.duration);
+ assert.equal(birth.strength,submit.strength);assert.equal(birth.decay,submit.decay);
+ assert.equal(birth.stroke,0);assert.equal(submit.stroke,0);assert.equal(click.stroke,1);
+ assert.equal(click.duration,submit.duration);assert.equal(click.strength,submit.strength);
 });
